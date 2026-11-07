@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <title>Pi Dashboard</title>
+    <style>
+        body { font-family: sans-serif; background: #222; color: #fff; text-align: center; padding-top: 30px; }
+        .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; max-width: 900px; margin: 0 auto; }
+        .card { background: #333; padding: 20px; width: 250px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .val { font-size: 1.8em; color: #4CAF50; font-weight: bold; margin-top: 10px; }
+        h1 { margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+    <h1>Raspberry Pi Dashboard</h1>
+    
+    <div class="container">
+        <!-- Teplota -->
+        <div class="card">
+            <h3>Teplota CPU</h3>
+            <div class="val" id="temp">...</div>
+        </div>
+        
+        <!-- RAM -->
+        <div class="card">
+            <h3>Využití RAM</h3>
+            <div class="val" id="ram">...</div>
+        </div>
+
+        <!-- Bitcoin -->
+        <div class="card">
+            <h3>Bitcoin (USD)</h3>
+            <div class="val" id="btc" style="color: #f7931a;">...</div>
+        </div>
+
+        <!-- GitHub -->
+        <div class="card">
+            <h3>GitHub Repozitáře</h3>
+            <div class="val" id="repos" style="color: #6cc644;">...</div>
+            <p id="followers" style="margin: 5px 0 0 0; font-size: 0.9em; color: #aaa;"></p>
+        </div>
+    </div>
+
+    <script>
+        function updateData() {
+            fetch('/api/stats')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('temp').innerText = data.temperature + " °C";
+                    
+                    // .toFixed(1) zařídí jedno desetinné místo (např. 15.4 %)
+                    document.getElementById('ram').innerText = data.ram_percent.toFixed(1) + " %";
+                    
+                    document.getElementById('btc').innerText = "$" + data.btc_price;
+                    document.getElementById('repos').innerText = data.github.public_repos;
+                    document.getElementById('followers').innerText = "Sledující: " + data.github.followers;
+                })
+                .catch(err => console.error("Chyba při načítání dat:", err));
+        }
+
+        // Aktualizovat každých 5 sekund
+        setInterval(updateData, 5000);
+        updateData(); // Spustit ihned
+    </script>
+    
+</body>
+</html>
