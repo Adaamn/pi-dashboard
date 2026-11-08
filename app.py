@@ -5,16 +5,13 @@ from flask import Flask, jsonify, render_template
 
 app = Flask(__name__)
 
-# Tvoje uživatelské jméno na GitHubu
 GITHUB_USERNAME = "Adaamn"
 
 def get_temperature():
     try:
-        # Cesta platná pro Raspberry Pi (Linux)
         with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
             return round(float(f.read()) / 1000.0, 1)
     except:
-        # Pokud neběží na Pi (např. test na Windows), vrátí 0.0
         return 0.0
 
 def get_crypto_price():
@@ -28,7 +25,7 @@ def get_crypto_price():
 def get_github_stats():
     try:
         url = f'https://api.github.com/users/{GITHUB_USERNAME}'
-        # GitHub vyžaduje User-Agent hlavičku, jinak blokuje přístup
+
         headers = {'User-Agent': 'Pi-Dashboard-App'}
         res = requests.get(url, headers=headers, timeout=3).json()
         
