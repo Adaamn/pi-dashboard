@@ -2,65 +2,357 @@
 <html lang="cs">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pi Dashboard</title>
     <style>
-        body { font-family: sans-serif; background: #222; color: #fff; text-align: center; padding-top: 30px; }
-        .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; max-width: 900px; margin: 0 auto; }
-        .card { background: #333; padding: 20px; width: 250px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .val { font-size: 1.8em; color: #4CAF50; font-weight: bold; margin-top: 10px; }
-        h1 { margin-bottom: 30px; }
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: rgba(22, 27, 34, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-main: #f0f6fc;
+            --text-muted: #8b949e;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-f1: #f85149;
+            --accent-love: #ff7b72;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 25px;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .card-title {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-main);
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .stat-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 5px;
+        }
+
+        .sparkline-container {
+            width: 100%;
+            height: 50px;
+            margin-top: 10px;
+        }
+
+        .sparkline-svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible;
+        }
+
+        .sparkline-path {
+            fill: none;
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .temp-path {
+            stroke: var(--accent-blue);
+        }
+
+        .ram-path {
+            stroke: var(--accent-green);
+        }
+
+        .f1-card .stat-value {
+            color: var(--accent-f1);
+            font-size: 1.15rem;
+        }
+
+        .crypto-card .stat-value {
+            color: var(--accent-green);
+        }
+
+        .love-card {
+            border-color: rgba(255, 123, 114, 0.3);
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.8), rgba(50, 20, 30, 0.5));
+        }
+
+        .love-card .stat-value {
+            color: var(--accent-love);
+            font-size: 1.2rem;
+        }
+
+        .news-card {
+            grid-column: 1 / -1;
+            align-items: flex-start;
+            text-align: left;
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.8), rgba(20, 40, 70, 0.4));
+            border-color: rgba(88, 166, 255, 0.3);
+        }
+
+        .news-headline {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            margin-bottom: 8px;
+        }
+
+        .news-desc {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        .heart-icon {
+            display: inline-block;
+            animation: pulse 1.5s infinite;
+            color: #ff7b72;
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
-    <h1>Raspberry Pi Dashboard</h1>
-    
-    <div class="container">
-        <!-- Teplota -->
+
+    <h1>Personal Dashboard</h1>
+
+    <div class="dashboard-grid">
         <div class="card">
-            <h3>Teplota CPU</h3>
-            <div class="val" id="temp">...</div>
-        </div>
-        
-        <!-- RAM -->
-        <div class="card">
-            <h3>Využití RAM</h3>
-            <div class="val" id="ram">...</div>
+            <div class="card-title">Teplota CPU</div>
+            <div class="stat-value" id="temp-val">--°C</div>
+            <div class="sparkline-container">
+                <svg class="sparkline-svg" viewBox="0 0 200 50">
+                    <polyline id="temp-sparkline" class="sparkline-path temp-path" points="" />
+                </svg>
+            </div>
         </div>
 
-        <!-- Bitcoin -->
         <div class="card">
-            <h3>Bitcoin (USD)</h3>
-            <div class="val" id="btc" style="color: #f7931a;">...</div>
+            <div class="card-title">Využití RAM</div>
+            <div class="stat-value" id="ram-val">--%</div>
+            <div class="sparkline-container">
+                <svg class="sparkline-svg" viewBox="0 0 200 50">
+                    <polyline id="ram-sparkline" class="sparkline-path ram-path" points="" />
+                </svg>
+            </div>
         </div>
 
-        <!-- GitHub -->
+        <div class="card crypto-card">
+            <div class="card-title">Bitcoin (USD)</div>
+            <div class="stat-value" id="btc-val">Načítám...</div>
+            <div class="stat-sub">Live CoinGecko API</div>
+        </div>
+
         <div class="card">
-            <h3>GitHub Repozitáře</h3>
-            <div class="val" id="repos" style="color: #6cc644;">...</div>
-            <p id="followers" style="margin: 5px 0 0 0; font-size: 0.9em; color: #aaa;"></p>
+            <div class="card-title">PI ÚLOŽIŠTĚ</div>
+            <div class="stat-value" id="disk-val">--%</div>
+            <div class="stat-sub" id="uptime-val">Úložiště / Uptime</div>
+        </div>
+
+        <div class="card f1-card">
+            <div class="card-title">Další race F1</div>
+            <div class="stat-value" id="f1-name">Načítám...</div>
+            <div class="stat-sub" id="f1-countdown">--</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Počasí Praha</div>
+            <div class="stat-value" id="weather-temp">--°C</div>
+            <div class="stat-sub" id="weather-desc">Načítám...</div>
+        </div>
+
+        <div class="card love-card">
+            <div class="card-title"><span class="heart-icon">❤️</span>Výročí</div>
+            <div class="stat-value" id="love-countdown">Do výročí: --</div>
+            <div class="stat-sub" id="love-together">-- dní spolu</div>
+        </div>
+
+        <div class="card news-card">
+            <div class="card-title">📈 Nejnovější zpráva z trhů</div>
+            <div class="news-headline" id="news-title">Načítám nejnovější článek...</div>
+            <div class="news-desc" id="news-desc">Čekám na data z API.</div>
         </div>
     </div>
 
     <script>
-        function updateData() {
-            fetch('/api/stats')
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById('temp').innerText = data.temperature + " °C";
-                    
-                    // .toFixed(1) zařídí jedno desetinné místo (např. 15.4 %)
-                    document.getElementById('ram').innerText = data.ram_percent.toFixed(1) + " %";
-                    
-                    document.getElementById('btc').innerText = "$" + data.btc_price;
-                    document.getElementById('repos').innerText = data.github.public_repos;
-                    document.getElementById('followers').innerText = "Sledující: " + data.github.followers;
-                })
-                .catch(err => console.error("Chyba při načítání dat:", err));
+        let targetF1Date = null;
+        const maxHistoryPoints = 20;
+        const tempHistory = [];
+        const ramHistory = [];
+
+        function updateSparkline(historyArray, elementId, minVal, maxVal) {
+            const svgElement = document.getElementById(elementId);
+            if (!svgElement) return;
+            if (historyArray.length < 2) {
+                svgElement.setAttribute('points', '');
+                return;
+            }
+
+            const width = 200;
+            const height = 50;
+            const step = width / (maxHistoryPoints - 1);
+            let pointsStr = '';
+
+            for (let i = 0; i < historyArray.length; i++) {
+                const x = i * step;
+                const val = Math.min(Math.max(historyArray[i], minVal), maxVal);
+                const normalized = (val - minVal) / (maxVal - minVal || 1);
+                const y = height - (normalized * (height - 10) + 5);
+                pointsStr += `${x},${y} `;
+            }
+            svgElement.setAttribute('points', pointsStr.trim());
         }
 
-        setInterval(updateData, 5000);
-        updateData();
+        function updateLoveCounters() {
+            const startDate = new Date('2026-07-01T00:00:00');
+            const now = new Date();
+            
+            const diffTime = now - startDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0) {
+                document.getElementById('love-together').innerText = `${diffDays} dní spolu (1.7.)`;
+            } else {
+                document.getElementById('love-together').innerText = `Již brzy ❤️`;
+            }
+
+            let currentYear = now.getFullYear();
+            let nextAniversary = new Date(`${currentYear}-07-01T00:00:00`);
+            if (now > nextAniversary) {
+                nextAniversary = new Date(`${currentYear + 1}-07-01T00:00:00`);
+            }
+            const leftTime = nextAniversary - now;
+            const leftDays = Math.ceil(leftTime / (1000 * 60 * 60 * 24));
+            document.getElementById('love-countdown').innerText = `${leftDays} dní`;
+        }
+
+        function updateCountdown() {
+            if (!targetF1Date) return;
+            const now = new Date().getTime();
+            const distance = targetF1Date - now;
+
+            if (distance < 0) {
+                document.getElementById('f1-countdown').innerText = "Závod probíhá / skončil";
+                return;
+            }
+
+            const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+
+            document.getElementById('f1-countdown').innerText = `Start za: ${days}d ${hours}h ${minutes}m`;
+        }
+
+        function fetchHardware() {
+            fetch('/api/hardware')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('temp-val').innerText = data.temperature + '°C';
+                    tempHistory.push(data.temperature);
+                    if (tempHistory.length > maxHistoryPoints) tempHistory.shift();
+                    updateSparkline(tempHistory, 'temp-sparkline', 20, 85);
+
+                    document.getElementById('ram-val').innerText = data.ram_percent + '%';
+                    ramHistory.push(data.ram_percent);
+                    if (ramHistory.length > maxHistoryPoints) ramHistory.shift();
+                    updateSparkline(ramHistory, 'ram-sparkline', 0, 100);
+
+                    document.getElementById('disk-val').innerText = data.system.disk_percent + '% (Disk)';
+                    document.getElementById('uptime-val').innerText = `Využito ${data.system.disk_used}GB / Běží: ${data.system.uptime}`;
+                })
+                .catch(err => console.error('HW Chyba:', err));
+        }
+
+        function fetchExternal() {
+            fetch('/api/external')
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('btc-val').innerText = '$' + Number(data.btc_price).toLocaleString();
+
+                    if (data.weather) {
+                        document.getElementById('weather-temp').innerText = data.weather.temp + '°C';
+                        document.getElementById('weather-desc').innerText = data.weather.desc;
+                    }
+
+                    if (data.news) {
+                        document.getElementById('news-title').innerText = data.news.title;
+                        document.getElementById('news-desc').innerText = data.news.description;
+                    }
+
+                    if (data.f1 && data.f1.name) {
+                        document.getElementById('f1-name').innerText = data.f1.name;
+                        if (data.f1.datetime) {
+                            targetF1Date = new Date(data.f1.datetime).getTime();
+                            updateCountdown();
+                        }
+                    } else {
+                        document.getElementById('f1-name').innerText = data.f1.name;
+                    }
+                })
+                .catch(err => console.error('External Chyba:', err));
+        }
+
+        updateLoveCounters();
+        
+        fetchHardware();
+        fetchExternal();
+
+        setInterval(fetchHardware, 10000);
+        setInterval(fetchExternal, 60000);
+        setInterval(updateCountdown, 1000);
     </script>
-    
 </body>
 </html>
