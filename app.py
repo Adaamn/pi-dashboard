@@ -223,9 +223,12 @@ Jsi osobní parťák a AI asistent uživatele {user_name} na TV dashboardu.
 Právě teď je: {now_str}
 
 Data z mého systému:
-- Počasí: {weather['temp']}°C, {weather['desc']}
-- Nadcházející závod F1: {f1['name']}
-- Aktuální zpráva: {news['title']}
+- Počasí: 
+{weather['temp']}°C, {weather['desc']}
+- Nadcházející závod F1: 
+{f1['name']}
+- Aktuální zpráva: 
+{news['title']}
 - Kalendář:
 {calendar_text}
 
@@ -234,8 +237,9 @@ Pravidla pro výstup:
 2. FOKUS: Zaměř se HLAVNĚ na dnešek a nejbližší 2-3 dny.
 3. FAKTA: Vycházej STRICTNĚ a POUZE z poskytnutých dat. Nic si nevymýšlej.
 4. DNY: Ber den přesně tak, jak je napsaný na začátku řádku kalendáře. Pokud tam stojí POZÍTŘÍ, napiš "pozítří", nikdy ne "zítra". Dnes je jediná událost, která není zítra, pokud u ní není ZÍTRA.
-5. DÉLKA: 4 až 5 vět."""
-
+5. FORMÁT: Piš čistě obyčejným textem. NIKDY nepoužívej hvězdičky ani tučné písmo (**). Pro lepší přehlednost můžeš používat odrážky (-).
+6. DÉLKA: Piš podle potřeby, minimálně však 4 věty, horní limit není dán."""
+        
         client = anthropic.Anthropic(api_key=api_key)
         response = client.messages.create(
             model="claude-haiku-5-5",
