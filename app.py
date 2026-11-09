@@ -163,7 +163,7 @@ def get_calendar_events():
                     current_event[key] = val
 
         events.sort(key=lambda x: x['raw'])
-        cleaned_events = [{'title': e['title'], 'time': e['time']} for e in events[:4]]
+        cleaned_events = [{'title': e['title'], 'time': e['time']} for e in events[:6]]
         
         return cleaned_events if cleaned_events else [{'title': 'Žádné nadcházející události', 'time': ''}]
     except Exception as e:

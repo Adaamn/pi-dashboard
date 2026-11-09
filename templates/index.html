@@ -15,7 +15,6 @@
             --accent-green: #3fb950;
             --accent-f1: #f85149;
             --accent-love: #ff7b72;
-            --accent-calendar: #a371f7;
         }
 
         body {
@@ -180,11 +179,19 @@
         }
 
         .disk-path {
-            stroke: var(--accent-calendar);
+            stroke: var(--accent-blue);
         }
 
         .f1-card .stat-value {
-            color: var(--accent-f1);
+            color: var(--text-main);
+            font-size: 1.15rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .weather-card .stat-value {
+            color: var(--text-main);
             font-size: 1.15rem;
             font-weight: 700;
             text-align: center;
@@ -239,18 +246,20 @@
         }
 
         .alarms-card {
-            background: linear-gradient(135deg, rgba(22, 27, 34, 0.8), rgba(40, 30, 60, 0.4));
-            border: 1px solid rgba(163, 113, 247, 0.3);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(10px);
             border-radius: 16px;
-            padding: 16px;
-            box-shadow: 0 8px 32px rgba(163, 113, 247, 0.1);
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
         }
 
         .alarms-card .card-title {
-            color: var(--accent-calendar);
-            font-weight: 700;
-            margin-bottom: 12px;
             font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .alarms-list {
@@ -284,27 +293,23 @@
         }
 
         .sidebar-calendar {
-            background: linear-gradient(160deg, rgba(25, 22, 38, 0.85), rgba(15, 20, 30, 0.7));
-            border: 1px solid rgba(163, 113, 247, 0.35);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
             backdrop-filter: blur(10px);
             border-radius: 16px;
             padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: flex-start;
-            box-shadow: 0 8px 32px rgba(163, 113, 247, 0.15);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
         }
 
         .sidebar-calendar .card-title {
-            color: var(--accent-calendar);
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            font-size: 0.95rem;
+            color: var(--text-muted);
             margin-bottom: 15px;
             text-transform: uppercase;
             letter-spacing: 1px;
-            font-size: 0.95rem;
         }
 
         #calendar-list {
@@ -333,12 +338,12 @@
             top: 0;
             bottom: 0;
             width: 3px;
-            background: var(--accent-calendar);
+            background: var(--accent-blue);
         }
 
         .calendar-item:hover {
             background: rgba(255, 255, 255, 0.06);
-            border-color: rgba(163, 113, 247, 0.4);
+            border-color: rgba(255, 255, 255, 0.2);
             transform: translateX(2px);
         }
 
@@ -351,8 +356,8 @@
 
         .calendar-item-time {
             font-size: 0.78rem;
-            color: var(--accent-calendar);
-            background: rgba(163, 113, 247, 0.1);
+            color: var(--accent-blue);
+            background: rgba(88, 166, 255, 0.1);
             padding: 2px 8px;
             border-radius: 6px;
             display: inline-block;
@@ -434,7 +439,7 @@
                 <div class="stat-sub" id="f1-countdown">--</div>
             </div>
 
-            <div class="card">
+            <div class="card weather-card">
                 <div class="card-title">Počasí Praha</div>
                 <div class="stat-value" id="weather-temp">--°C</div>
                 <div class="stat-sub" id="weather-desc">Načítám...</div>
@@ -455,14 +460,14 @@
 
         <div class="sidebar-right">
             <div class="sidebar-calendar">
-                <div class="card-title">📅 Kalendář & Agenda</div>
+                <div class="card-title">Kalendář</div>
                 <div id="calendar-list">
                     <div class="stat-sub" style="text-align: left; padding: 10px 0;">Načítám události...</div>
                 </div>
             </div>
 
             <div class="alarms-card">
-                <div class="card-title">⏰ Ranní budíky</div>
+                <div class="card-title">Ranní budíky</div>
                 <div class="alarms-list">
                     <div class="alarm-row">
                         <span class="alarm-time-label">6:00</span>
