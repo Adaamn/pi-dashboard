@@ -22,7 +22,7 @@
             background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0;
-            padding: 20px;
+            padding: 40px 20px 20px 20px;            
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -231,6 +231,26 @@
             margin-bottom: 10px;
         }
 
+        .ai-card {
+            grid-column: 1 / -1;
+            align-items: flex-start;
+            text-align: left;
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.8), rgba(30, 45, 65, 0.4));
+            border-color: rgba(88, 166, 255, 0.25);
+        }
+
+        .ai-card .card-title {
+            color: var(--accent-blue);
+            font-weight: 700;
+        }
+
+        .ai-text {
+            font-size: 1rem;
+            color: var(--text-main);
+            line-height: 1.5;
+            font-weight: 400;
+        }
+
         .news-card {
             grid-column: 1 / -1;
             align-items: flex-start;
@@ -394,8 +414,10 @@
 
     <div class="header-container">
         <h1>Z.P.</h1>
+        <div class="digital-clock">
             <div class="clock-time" id="live-clock">--:--</div>
             <div class="clock-date" id="live-date">--</div>
+        </div>
     </div>
 
     <div class="dashboard-container">
@@ -462,6 +484,11 @@
                 <div class="card-title"><span class="heart-icon">❤️</span>Výročí</div>
                 <div class="stat-value" id="love-countdown">Do výročí: --</div>
                 <div class="stat-sub" id="love-together">-- dní spolu</div>
+            </div>
+
+            <div class="card ai-card">
+                <div class="card-title">✦ Z.P. <span id="ai-brief-time" style="color: var(--text-muted); font-weight: 400; text-transform: none; letter-spacing: 0;"></span></div>                
+                <div class="ai-text" id="ai-brief-text">Generování přehledu...</div>
             </div>
 
             <div class="card news-card">
@@ -555,7 +582,6 @@
         function updateClock() {
             const now = new Date();
             
-            // Čas (17:11)
             const timeFormatter = new Intl.DateTimeFormat('cs-CZ', {
                 timeZone: 'Europe/Prague',
                 hour: '2-digit',
@@ -563,7 +589,6 @@
                 hour12: false
             });
             
-            // Datum (Po 9. 11. 2026)
             const dateFormatter = new Intl.DateTimeFormat('cs-CZ', {
                 timeZone: 'Europe/Prague',
                 weekday: 'short',
@@ -669,7 +694,7 @@
                     updateSparkline(data.ram_history, 'ram-sparkline', 0, 100);
 
                     document.getElementById('disk-val').innerText = data.system.disk_percent + '%';
-                    renderGauge('disk-gauge-svg', data.system.disk_percent, '#a371f7');
+                    renderGauge('disk-gauge-svg', data.system.disk_percent, '#58a6ff');
                     
                     diskHistory.push(data.system.disk_percent);
                     if (diskHistory.length > maxHistoryPoints) diskHistory.shift();
@@ -692,6 +717,14 @@
                     if (data.news) {
                         document.getElementById('news-title').innerText = data.news.title;
                         document.getElementById('news-desc').innerText = data.news.description;
+                    }
+
+                    if (data.ai_brief) {
+                        document.getElementById('ai-brief-text').innerText = data.ai_brief;
+                    }
+
+                    if (data.ai_brief_time) {
+                        document.getElementById('ai-brief-time').innerText = '· ' + data.ai_brief_time;
                     }
 
                     if (data.f1 && data.f1.name) {

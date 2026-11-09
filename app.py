@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 from flask import Flask, jsonify, render_template
 from dotenv import load_dotenv
+import anthropic
 
 load_dotenv()
 
@@ -13,6 +14,11 @@ app = Flask(__name__)
 MAX_HISTORY = 20
 temp_history = []
 ram_history = []
+
+ai_summary_cache = {
+    "text": "Načítání AI shrnutí...",
+    "last_updated": None
+}
 
 def get_temperature():
     try:
@@ -169,6 +175,91 @@ def get_calendar_events():
     except Exception as e:
         return [{'title': 'Chyba načítání kalendáře', 'time': ''}]
 
+def get_ai_daily_brief():
+    global ai_summary_cache
+    now = datetime.now()
+    
+    if ai_summary_cache["last_updated"] and (now - ai_summary_cache["last_updated"]).total_seconds() < 6 * 3600:
+        return ai_summary_cache["text"]
+
+    api_key = os.getenv('ANTHROPIC_API_KEY')
+    if not api_key:
+        return "Chybí ANTHROPIC_API_KEY v .env"
+
+    try:
+        weather = get_weather()
+        f1 = get_f1_next_race()
+        news = get_financial_news()
+        calendar = get_calendar_events()
+
+        now_dt = datetime.now()
+        today = now_dt.date()
+        now_str = now_dt.strftime("%d.%m.%Y %H:%M")
+
+        cal_lines = []
+        for ev in calendar:
+            try:
+                d, m = ev['time'].split(' ')[0].strip('.').split('.')
+                diff = (datetime(today.year, int(m), int(d)).date() - today).days
+                if diff > 3:
+                    continue
+                if diff <= 0:
+                    when = "DNES"
+                elif diff == 1:
+                    when = "ZÍTRA"
+                elif diff == 2:
+                    when = "POZÍTŘÍ"
+                else:
+                    when = f"za {diff} dny"
+                cal_lines.append(f"- {when}: {ev['title']}")
+            except Exception:
+                cal_lines.append(f"- {ev['title']} ({ev['time']})")
+        calendar_text = "\n".join(cal_lines) if cal_lines else "Nic v nejbližších třech dnech."
+
+        user_name = os.getenv('USER_NAME', '')
+        
+        prompt = f"""
+Jsi osobní parťák a AI asistent uživatele {user_name} na TV dashboardu.
+Právě teď je: {now_str}
+
+Data z mého systému:
+- Počasí: {weather['temp']}°C, {weather['desc']}
+- Nadcházející závod F1: {f1['name']}
+- Aktuální zpráva: {news['title']}
+- Kalendář:
+{calendar_text}
+
+Pravidla pro výstup:
+1. TÓN: Buď neformální parťák, tykej mi, piš přirozeně a lidsky.
+2. FOKUS: Zaměř se HLAVNĚ na dnešek a nejbližší 2-3 dny.
+3. FAKTA: Vycházej STRICTNĚ a POUZE z poskytnutých dat. Nic si nevymýšlej.
+4. DNY: Ber den přesně tak, jak je napsaný na začátku řádku kalendáře. Pokud tam stojí POZÍTŘÍ, napiš "pozítří", nikdy ne "zítra". Dnes je jediná událost, která není zítra, pokud u ní není ZÍTRA.
+5. DÉLKA: 4 až 5 vět."""
+
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-haiku-5-5",
+            max_tokens=1024,
+            thinking={"type": "disabled"},
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        summary_text = "".join(
+            b.text for b in response.content if getattr(b, 'type', None) == 'text'
+        ).strip()
+
+        if not summary_text:
+            print(f"Prázdná odpověď, stop_reason: {response.stop_reason}")
+            return "AI shrnutí se nepodařilo přečíst."
+
+        ai_summary_cache["text"] = summary_text
+        ai_summary_cache["last_updated"] = now
+        return summary_text
+
+    except Exception as e:
+        print(f"Claude API Chyba: {e}")
+        return ai_summary_cache["text"] if ai_summary_cache["last_updated"] else "AI shrnutí dočasně nedostupné."
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -203,8 +294,10 @@ def external_stats():
         'f1': get_f1_next_race(),
         'news': get_financial_news(),
         'weather': get_weather(),
-        'calendar': get_calendar_events()
+        'calendar': get_calendar_events(),
+        'ai_brief': get_ai_daily_brief(),
+        'ai_brief_time': ai_summary_cache["last_updated"].strftime("%H:%M") if ai_summary_cache["last_updated"] else ''
     })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
