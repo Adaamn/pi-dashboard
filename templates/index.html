@@ -46,16 +46,28 @@
         }
 
         .digital-clock {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: var(--accent-blue);
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             padding: 8px 18px;
             border-radius: 12px;
             backdrop-filter: blur(10px);
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .clock-time {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--accent-blue);
             font-variant-numeric: tabular-nums;
+            line-height: 1.1;
+        }
+
+        .clock-date {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-top: 2px;
         }
 
         .dashboard-container {
@@ -382,7 +394,8 @@
 
     <div class="header-container">
         <h1>Z.P.</h1>
-        <div class="digital-clock" id="live-clock">--:--</div>
+            <div class="clock-time" id="live-clock">--:--</div>
+            <div class="clock-date" id="live-date">--</div>
     </div>
 
     <div class="dashboard-container">
@@ -541,13 +554,26 @@
 
         function updateClock() {
             const now = new Date();
-            const formatter = new Intl.DateTimeFormat('cs-CZ', {
+            
+            // Čas (17:11)
+            const timeFormatter = new Intl.DateTimeFormat('cs-CZ', {
                 timeZone: 'Europe/Prague',
                 hour: '2-digit',
                 minute: '2-digit',
                 hour12: false
             });
-            document.getElementById('live-clock').innerText = formatter.format(now);
+            
+            // Datum (Po 9. 11. 2026)
+            const dateFormatter = new Intl.DateTimeFormat('cs-CZ', {
+                timeZone: 'Europe/Prague',
+                weekday: 'short',
+                day: 'numeric',
+                month: 'numeric',
+                year: 'numeric'
+            });
+
+            document.getElementById('live-clock').innerText = timeFormatter.format(now);
+            document.getElementById('live-date').innerText = dateFormatter.format(now);
         }
 
         function updateLoveCounters() {
