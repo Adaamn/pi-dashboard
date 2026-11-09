@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi Dashboard</title>
+    <title>PI Dashboard</title>
     <style>
         :root {
             --bg-color: #0d1117;
@@ -15,6 +15,7 @@
             --accent-green: #3fb950;
             --accent-f1: #f85149;
             --accent-love: #ff7b72;
+            --accent-calendar: #a371f7;
         }
 
         body {
@@ -29,19 +30,71 @@
             min-height: 100vh;
         }
 
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 1250px;
+            margin-bottom: 25px;
+        }
+
         h1 {
             font-size: 1.8rem;
-            margin-bottom: 25px;
+            margin: 0;
             font-weight: 600;
             letter-spacing: -0.5px;
         }
 
+        .digital-clock {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--accent-blue);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 8px 18px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 340px;
+            gap: 24px;
+            width: 100%;
+            max-width: 1250px;
+            align-items: start;
+        }
+
+        .sidebar-right {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: sticky;
+            top: 20px;
+        }
+
+        @media (max-width: 950px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+            .header-container {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            .sidebar-right {
+                position: static;
+            }
+        }
+
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
             gap: 20px;
             width: 100%;
-            max-width: 900px;
         }
 
         .card {
@@ -70,12 +123,26 @@
             letter-spacing: 1px;
         }
 
-        .stat-value {
-            font-size: 1.8rem;
+        .gauge-container {
+            position: relative;
+            width: 160px;
+            height: 90px;
+            margin-bottom: 5px;
+        }
+
+        .gauge-svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .gauge-value {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.6rem;
             font-weight: 700;
             color: var(--text-main);
-            text-align: center;
-            margin-bottom: 10px;
         }
 
         .stat-sub {
@@ -87,8 +154,8 @@
 
         .sparkline-container {
             width: 100%;
-            height: 50px;
-            margin-top: 10px;
+            height: 40px;
+            margin-top: 5px;
         }
 
         .sparkline-svg {
@@ -99,7 +166,7 @@
 
         .sparkline-path {
             fill: none;
-            stroke-width: 2.5;
+            stroke-width: 2;
             stroke-linecap: round;
             stroke-linejoin: round;
         }
@@ -112,13 +179,24 @@
             stroke: var(--accent-green);
         }
 
+        .disk-path {
+            stroke: var(--accent-calendar);
+        }
+
         .f1-card .stat-value {
             color: var(--accent-f1);
             font-size: 1.15rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 10px;
         }
 
         .crypto-card .stat-value {
             color: var(--accent-green);
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 10px;
         }
 
         .love-card {
@@ -129,6 +207,9 @@
         .love-card .stat-value {
             color: var(--accent-love);
             font-size: 1.2rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 10px;
         }
 
         .news-card {
@@ -143,13 +224,139 @@
             font-size: 1.15rem;
             font-weight: 700;
             color: var(--accent-blue);
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            line-height: 1.3;
         }
 
         .news-desc {
-            font-size: 0.9rem;
+            font-size: 0.92rem;
             color: var(--text-muted);
-            line-height: 1.4;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .alarms-card {
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.8), rgba(40, 30, 60, 0.4));
+            border: 1px solid rgba(163, 113, 247, 0.3);
+            border-radius: 16px;
+            padding: 16px;
+            box-shadow: 0 8px 32px rgba(163, 113, 247, 0.1);
+        }
+
+        .alarms-card .card-title {
+            color: var(--accent-calendar);
+            font-weight: 700;
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+        }
+
+        .alarms-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .alarm-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.9rem;
+        }
+
+        .alarm-time-label {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .alarm-countdown-text {
+            color: var(--accent-blue);
+            font-weight: 500;
+            font-size: 0.85rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .sidebar-calendar {
+            background: linear-gradient(160deg, rgba(25, 22, 38, 0.85), rgba(15, 20, 30, 0.7));
+            border: 1px solid rgba(163, 113, 247, 0.35);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            box-shadow: 0 8px 32px rgba(163, 113, 247, 0.15);
+        }
+
+        .sidebar-calendar .card-title {
+            color: var(--accent-calendar);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.95rem;
+        }
+
+        #calendar-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .calendar-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 12px;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .calendar-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--accent-calendar);
+        }
+
+        .calendar-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(163, 113, 247, 0.4);
+            transform: translateX(2px);
+        }
+
+        .calendar-item-title {
+            font-weight: 600;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+
+        .calendar-item-time {
+            font-size: 0.78rem;
+            color: var(--accent-calendar);
+            background: rgba(163, 113, 247, 0.1);
+            padding: 2px 8px;
+            border-radius: 6px;
+            display: inline-block;
+            font-weight: 500;
         }
 
         @keyframes pulse {
@@ -168,82 +375,152 @@
 </head>
 <body>
 
-    <h1>Personal Dashboard</h1>
+    <div class="header-container">
+        <h1>Z.P.</h1>
+        <div class="digital-clock" id="live-clock">--:--</div>
+    </div>
 
-    <div class="dashboard-grid">
-        <div class="card">
-            <div class="card-title">Teplota CPU</div>
-            <div class="stat-value" id="temp-val">--°C</div>
-            <div class="sparkline-container">
-                <svg class="sparkline-svg" viewBox="0 0 200 50">
-                    <polyline id="temp-sparkline" class="sparkline-path temp-path" points="" />
-                </svg>
+    <div class="dashboard-container">
+        
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-title">Teplota CPU</div>
+                <div class="gauge-container">
+                    <svg class="gauge-svg" viewBox="0 0 120 70" id="temp-gauge-svg"></svg>
+                    <div class="gauge-value" id="temp-val">--°C</div>
+                </div>
+                <div class="sparkline-container">
+                    <svg class="sparkline-svg" viewBox="0 0 200 40">
+                        <polyline id="temp-sparkline" class="sparkline-path temp-path" points="" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Využití RAM</div>
+                <div class="gauge-container">
+                    <svg class="gauge-svg" viewBox="0 0 120 70" id="ram-gauge-svg"></svg>
+                    <div class="gauge-value" id="ram-val">--%</div>
+                </div>
+                <div class="sparkline-container">
+                    <svg class="sparkline-svg" viewBox="0 0 200 40">
+                        <polyline id="ram-sparkline" class="sparkline-path ram-path" points="" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">PI ÚLOŽIŠTĚ</div>
+                <div class="gauge-container">
+                    <svg class="gauge-svg" viewBox="0 0 120 70" id="disk-gauge-svg"></svg>
+                    <div class="gauge-value" id="disk-val">--%</div>
+                </div>
+                <div class="sparkline-container">
+                    <svg class="sparkline-svg" viewBox="0 0 200 40">
+                        <polyline id="disk-sparkline" class="sparkline-path disk-path" points="" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="card crypto-card">
+                <div class="card-title">Bitcoin (USD)</div>
+                <div class="stat-value" id="btc-val">Načítám...</div>
+                <div class="stat-sub">Live CoinGecko API</div>
+            </div>
+
+            <div class="card f1-card">
+                <div class="card-title">Další race F1</div>
+                <div class="stat-value" id="f1-name">Načítám...</div>
+                <div class="stat-sub" id="f1-countdown">--</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Počasí Praha</div>
+                <div class="stat-value" id="weather-temp">--°C</div>
+                <div class="stat-sub" id="weather-desc">Načítám...</div>
+            </div>
+
+            <div class="card love-card">
+                <div class="card-title"><span class="heart-icon">❤️</span>Výročí</div>
+                <div class="stat-value" id="love-countdown">Do výročí: --</div>
+                <div class="stat-sub" id="love-together">-- dní spolu</div>
+            </div>
+
+            <div class="card news-card">
+                <div class="card-title">📰 Seznam Zprávy</div>
+                <div class="news-headline" id="news-title">Načítám nejnovější zprávu...</div>
+                <div class="news-desc" id="news-desc">Čekám na data z RSS.</div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-title">Využití RAM</div>
-            <div class="stat-value" id="ram-val">--%</div>
-            <div class="sparkline-container">
-                <svg class="sparkline-svg" viewBox="0 0 200 50">
-                    <polyline id="ram-sparkline" class="sparkline-path ram-path" points="" />
-                </svg>
+        <div class="sidebar-right">
+            <div class="sidebar-calendar">
+                <div class="card-title">📅 Kalendář & Agenda</div>
+                <div id="calendar-list">
+                    <div class="stat-sub" style="text-align: left; padding: 10px 0;">Načítám události...</div>
+                </div>
+            </div>
+
+            <div class="alarms-card">
+                <div class="card-title">⏰ Ranní budíky</div>
+                <div class="alarms-list">
+                    <div class="alarm-row">
+                        <span class="alarm-time-label">6:00</span>
+                        <span class="alarm-countdown-text" id="countdown-06">--</span>
+                    </div>
+                    <div class="alarm-row">
+                        <span class="alarm-time-label">7:00</span>
+                        <span class="alarm-countdown-text" id="countdown-07">--</span>
+                    </div>
+                    <div class="alarm-row">
+                        <span class="alarm-time-label">8:00</span>
+                        <span class="alarm-countdown-text" id="countdown-08">--</span>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="card crypto-card">
-            <div class="card-title">Bitcoin (USD)</div>
-            <div class="stat-value" id="btc-val">Načítám...</div>
-            <div class="stat-sub">Live CoinGecko API</div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">PI ÚLOŽIŠTĚ</div>
-            <div class="stat-value" id="disk-val">--%</div>
-            <div class="stat-sub" id="uptime-val">Úložiště / Uptime</div>
-        </div>
-
-        <div class="card f1-card">
-            <div class="card-title">Další race F1</div>
-            <div class="stat-value" id="f1-name">Načítám...</div>
-            <div class="stat-sub" id="f1-countdown">--</div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">Počasí Praha</div>
-            <div class="stat-value" id="weather-temp">--°C</div>
-            <div class="stat-sub" id="weather-desc">Načítám...</div>
-        </div>
-
-        <div class="card love-card">
-            <div class="card-title"><span class="heart-icon">❤️</span>Výročí</div>
-            <div class="stat-value" id="love-countdown">Do výročí: --</div>
-            <div class="stat-sub" id="love-together">-- dní spolu</div>
-        </div>
-
-        <div class="card news-card">
-            <div class="card-title">📈 Nejnovější zpráva z trhů</div>
-            <div class="news-headline" id="news-title">Načítám nejnovější článek...</div>
-            <div class="news-desc" id="news-desc">Čekám na data z API.</div>
-        </div>
     </div>
 
     <script>
         let targetF1Date = null;
         const maxHistoryPoints = 20;
-        const tempHistory = [];
-        const ramHistory = [];
+        const diskHistory = [];
+
+        function renderGauge(svgId, percent, activeColor) {
+            const svg = document.getElementById(svgId);
+            if (!svg) return;
+            
+            const totalBars = 36;
+            const radius = 52;
+            const cx = 60;
+            const cy = 60;
+            const activeBars = Math.round((percent / 100) * totalBars);
+            
+            let html = '';
+            for (let i = 0; i < totalBars; i++) {
+                const angle = Math.PI + (i / (totalBars - 1)) * Math.PI;
+                const x1 = cx + (radius - 8) * Math.cos(angle);
+                const y1 = cy + (radius - 8) * Math.sin(angle);
+                const x2 = cx + radius * Math.cos(angle);
+                const y2 = cy + radius * Math.sin(angle);
+                
+                const color = i < activeBars ? activeColor : 'rgba(255, 255, 255, 0.1)';
+                html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/>`;
+            }
+            svg.innerHTML = html;
+        }
 
         function updateSparkline(historyArray, elementId, minVal, maxVal) {
             const svgElement = document.getElementById(elementId);
             if (!svgElement) return;
-            if (historyArray.length < 2) {
+            if (!historyArray || historyArray.length < 2) {
                 svgElement.setAttribute('points', '');
                 return;
             }
 
             const width = 200;
-            const height = 50;
+            const height = 40;
             const step = width / (maxHistoryPoints - 1);
             let pointsStr = '';
 
@@ -251,10 +528,21 @@
                 const x = i * step;
                 const val = Math.min(Math.max(historyArray[i], minVal), maxVal);
                 const normalized = (val - minVal) / (maxVal - minVal || 1);
-                const y = height - (normalized * (height - 10) + 5);
+                const y = height - (normalized * (height - 8) + 4);
                 pointsStr += `${x},${y} `;
             }
             svgElement.setAttribute('points', pointsStr.trim());
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('cs-CZ', {
+                timeZone: 'Europe/Prague',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
+            document.getElementById('live-clock').innerText = formatter.format(now);
         }
 
         function updateLoveCounters() {
@@ -296,22 +584,65 @@
             document.getElementById('f1-countdown').innerText = `Start za: ${days}d ${hours}h ${minutes}m`;
         }
 
+        function updateAlarms() {
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Europe/Prague',
+                year: 'numeric', month: 'numeric', day: 'numeric',
+                hour: 'numeric', minute: 'numeric', second: 'numeric',
+                hour12: false
+            });
+
+            const parts = formatter.formatToParts(now);
+            const getPart = (type) => parts.find(p => p.type === type).value;
+            
+            const year = parseInt(getPart('year'));
+            const month = parseInt(getPart('month')) - 1;
+            const day = parseInt(getPart('day'));
+            const hour = parseInt(getPart('hour'));
+            const minute = parseInt(getPart('minute'));
+            const second = parseInt(getPart('second'));
+
+            const nowPrague = new Date(year, month, day, hour, minute, second).getTime();
+
+            const targetHours = [6, 7, 8];
+            const targetIds = ['countdown-06', 'countdown-07', 'countdown-08'];
+
+            targetHours.forEach((targetHour, index) => {
+                let target = new Date(year, month, day, targetHour, 0, 0).getTime();
+                
+                if (nowPrague >= target) {
+                    target += 24 * 60 * 60 * 1000;
+                }
+
+                const diff = target - nowPrague;
+
+                const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+                document.getElementById(targetIds[index]).innerText = `za ${h}h ${m}m`;
+            });
+        }
+
         function fetchHardware() {
             fetch('/api/hardware')
                 .then(res => res.json())
                 .then(data => {
                     document.getElementById('temp-val').innerText = data.temperature + '°C';
-                    tempHistory.push(data.temperature);
-                    if (tempHistory.length > maxHistoryPoints) tempHistory.shift();
-                    updateSparkline(tempHistory, 'temp-sparkline', 20, 85);
+                    const tempPercent = Math.min(Math.max(((data.temperature - 20) / (85 - 20)) * 100, 0), 100);
+                    renderGauge('temp-gauge-svg', tempPercent, '#58a6ff');
+                    updateSparkline(data.temp_history, 'temp-sparkline', 20, 85);
 
                     document.getElementById('ram-val').innerText = data.ram_percent + '%';
-                    ramHistory.push(data.ram_percent);
-                    if (ramHistory.length > maxHistoryPoints) ramHistory.shift();
-                    updateSparkline(ramHistory, 'ram-sparkline', 0, 100);
+                    renderGauge('ram-gauge-svg', data.ram_percent, '#3fb950');
+                    updateSparkline(data.ram_history, 'ram-sparkline', 0, 100);
 
-                    document.getElementById('disk-val').innerText = data.system.disk_percent + '% (Disk)';
-                    document.getElementById('uptime-val').innerText = `Využito ${data.system.disk_used}GB / Běží: ${data.system.uptime}`;
+                    document.getElementById('disk-val').innerText = data.system.disk_percent + '%';
+                    renderGauge('disk-gauge-svg', data.system.disk_percent, '#a371f7');
+                    
+                    diskHistory.push(data.system.disk_percent);
+                    if (diskHistory.length > maxHistoryPoints) diskHistory.shift();
+                    updateSparkline(diskHistory, 'disk-sparkline', 0, 100);
                 })
                 .catch(err => console.error('HW Chyba:', err));
         }
@@ -341,18 +672,36 @@
                     } else {
                         document.getElementById('f1-name').innerText = data.f1.name;
                     }
+
+                    if (data.calendar && Array.isArray(data.calendar)) {
+                        const calContainer = document.getElementById('calendar-list');
+                        calContainer.innerHTML = '';
+                        data.calendar.forEach(ev => {
+                            const item = document.createElement('div');
+                            item.className = 'calendar-item';
+                            item.innerHTML = `
+                                <div class="calendar-item-title">${ev.title}</div>
+                                <div class="calendar-item-time">${ev.time}</div>
+                            `;
+                            calContainer.appendChild(item);
+                        });
+                    }
                 })
                 .catch(err => console.error('External Chyba:', err));
         }
 
+        updateClock();
         updateLoveCounters();
+        updateAlarms();
         
         fetchHardware();
         fetchExternal();
 
+        setInterval(updateClock, 1000);
         setInterval(fetchHardware, 10000);
         setInterval(fetchExternal, 60000);
         setInterval(updateCountdown, 1000);
+        setInterval(updateAlarms, 1000);
     </script>
 </body>
 </html>

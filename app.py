@@ -2,10 +2,17 @@ import os
 import psutil
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from flask import Flask, jsonify, render_template
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
+
+MAX_HISTORY = 20
+temp_history = []
+ram_history = []
 
 def get_temperature():
     try:
@@ -64,7 +71,7 @@ def get_system_stats():
 
 def get_financial_news():
     try:
-        url = 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664'
+        url = 'https://www.seznamzpravy.cz/rss/nejnovejsi'
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.get(url, headers=headers, timeout=3)
         
@@ -75,17 +82,17 @@ def get_financial_news():
                 title = item.find('title')
                 desc = item.find('description')
                 
-                title_text = title.text.strip() if title is not None and title.text else "Investiční zpráva"
+                title_text = title.text.strip() if title is not None and title.text else "Aktuální zpráva"
                 desc_text = desc.text.strip() if desc is not None and desc.text else ""
                 
                 return {
                     'title': title_text,
-                    'description': desc_text[:140] + '...' if len(desc_text) > 140 else desc_text
+                    'description': desc_text[:300] + '...' if len(desc_text) > 300 else desc_text
                 }
     except:
         pass
     
-    return {'title': 'Trhy jsou v pohybu', 'description': 'Sledujeme aktuální makroekonomická data a vývoj cen.'}
+    return {'title': 'Zprávy jsou online', 'description': 'Sledujeme aktuální dění na Seznam Zprávách.'}
 
 def get_weather():
     try:
@@ -111,6 +118,57 @@ def get_weather():
     except:
         return {'temp': '--', 'desc': 'Offline'}
 
+def get_calendar_events():
+    try:
+        ics_url = os.getenv('CALENDAR_ICS_URL')
+        
+        if not ics_url:
+            return [{'title': 'Chybí CALENDAR_ICS_URL v .env', 'time': 'Zkontroluj konfiguraci'}]
+
+        res = requests.get(ics_url, timeout=4)
+        if res.status_code != 200:
+            return [{'title': 'Kalendář nedostupný', 'time': ''}]
+
+        lines = res.text.splitlines()
+        events = []
+        current_event = None
+        now = datetime.now(timezone.utc)
+
+        for line in lines:
+            if line.startswith('BEGIN:VEVENT'):
+                current_event = {}
+            elif line.startswith('END:VEVENT') and current_event:
+                summary = current_event.get('SUMMARY', 'Bez názvu')
+                dtstart = current_event.get('DTSTART', '')
+                
+                parsed_time = None
+                try:
+                    if 'T' in dtstart:
+                        dt_clean = dtstart.split('Z')[0]
+                        parsed_time = datetime.strptime(dt_clean, '%Y%m%dT%H%M%S').replace(tzinfo=timezone.utc)
+                        time_str = parsed_time.astimezone().strftime('%d.%m. %H:%M')
+                    else:
+                        parsed_time = datetime.strptime(dtstart, '%Y%m%d').replace(tzinfo=timezone.utc)
+                        time_str = parsed_time.strftime('%d.%m. (Celý den)')
+                    
+                    if parsed_time >= now - timedelta(hours=1):
+                        events.append({'title': summary, 'time': time_str, 'raw': parsed_time})
+                except:
+                    pass
+                current_event = None
+            elif current_event is not None:
+                if ':' in line:
+                    key, val = line.split(':', 1)
+                    key = key.split(';')[0]
+                    current_event[key] = val
+
+        events.sort(key=lambda x: x['raw'])
+        cleaned_events = [{'title': e['title'], 'time': e['time']} for e in events[:4]]
+        
+        return cleaned_events if cleaned_events else [{'title': 'Žádné nadcházející události', 'time': ''}]
+    except Exception as e:
+        return [{'title': 'Chyba načítání kalendáře', 'time': ''}]
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -118,10 +176,23 @@ def index():
 @app.route('/api/hardware')
 def hardware_stats():
     ram = psutil.virtual_memory()
+    current_temp = get_temperature()
+    current_ram = ram.percent
+
+    temp_history.push(current_temp) if hasattr(temp_history, 'push') else temp_history.append(current_temp)
+    ram_history.push(current_ram) if hasattr(ram_history, 'push') else ram_history.append(current_ram)
+
+    if len(temp_history) > MAX_HISTORY:
+        temp_history.pop(0)
+    if len(ram_history) > MAX_HISTORY:
+        ram_history.pop(0)
+
     return jsonify({
-        'temperature': get_temperature(),
+        'temperature': current_temp,
         'ram_used': round(ram.used / (1024 * 1024 * 1024), 1),
-        'ram_percent': ram.percent,
+        'ram_percent': current_ram,
+        'temp_history': temp_history,
+        'ram_history': ram_history,
         'system': get_system_stats()
     })
 
@@ -131,7 +202,8 @@ def external_stats():
         'btc_price': get_crypto_price(),
         'f1': get_f1_next_race(),
         'news': get_financial_news(),
-        'weather': get_weather()
+        'weather': get_weather(),
+        'calendar': get_calendar_events()
     })
 
 if __name__ == '__main__':
