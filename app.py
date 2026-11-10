@@ -207,7 +207,12 @@ def get_calendar_events():
                         parsed_time = datetime.strptime(dtstart, '%Y%m%d').replace(tzinfo=timezone.utc)
                         time_str = parsed_time.strftime('%d.%m. (Celý den)')
                     
-                    if parsed_time >= now - timedelta(hours=1):
+                    if 'T' in dtstart:
+                        cutoff = now - timedelta(hours=1)
+                    else:
+                        d = datetime.now().date()
+                        cutoff = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+                    if parsed_time >= cutoff:
                         events.append({'title': summary, 'time': time_str, 'raw': parsed_time})
                 except:
                     pass
