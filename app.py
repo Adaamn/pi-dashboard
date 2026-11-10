@@ -6,9 +6,8 @@ import psutil
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
-from flask import Flask, jsonify, render_template, request, abort
+from flask import Flask, jsonify, render_template
 from dotenv import load_dotenv
-from jarvis import get_jarvis_response
 import anthropic
 
 load_dotenv()
@@ -382,65 +381,6 @@ def hardware_stats():
         'ram_history': ram_history,
         'system': get_system_stats()
     })
-
-@app.before_request
-def protect_jarvis():
-    if request.path == '/jarvis' or request.path.startswith('/api/jarvis'):
-        if request.remote_addr != '127.0.0.1':
-            abort(403)
-
-
-@app.route('/jarvis')
-def jarvis_page():
-    return render_template('jarvis.html')
-
-
-@app.route('/api/jarvis/chat', methods=['POST'])
-def jarvis_chat():
-    data = request.get_json(silent=True) or {}
-
-    message = data.get('message', '')
-    history = data.get('history', [])
-
-    if not isinstance(message, str) or not message.strip():
-        return jsonify({'error': 'Zadej zprávu.'}), 400
-
-    if len(message) > 2000:
-        return jsonify({'error': 'Zpráva je příliš dlouhá.'}), 400
-
-    if not isinstance(history, list):
-        history = []
-
-    history = [
-        item for item in history[-10:]
-        if isinstance(item, dict)
-    ]
-
-    ram = psutil.virtual_memory()
-
-    context = {
-        'temperature_c': get_temperature(),
-        'ram_percent': ram.percent,
-        'ram_used_gb': round(ram.used / (1024 ** 3), 2),
-        'ram_total_gb': round(ram.total / (1024 ** 3), 2),
-        'system': get_system_stats()
-    }
-
-    try:
-        answer = get_jarvis_response(
-            message.strip(),
-            history,
-            json.dumps(context, ensure_ascii=False)
-        )
-
-        return jsonify({'answer': answer})
-
-    except Exception:
-        app.logger.exception("Jarvis API chyba")
-        return jsonify({
-            'error': 'Jarvis se nyní nemůže spojit s AI službou.'
-        }), 503
-
 
 @app.route('/api/external')
 def external_stats():
