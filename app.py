@@ -375,7 +375,8 @@ def hardware_stats():
 
     return jsonify({
         'temperature': current_temp,
-        'ram_used': round(ram.used / (1024 * 1024 * 1024), 1),
+        'ram_used': round(ram.used / (1024 ** 3), 1),
+        'ram_total': round(ram.total / (1024 ** 3), 1),
         'ram_percent': current_ram,
         'temp_history': temp_history,
         'ram_history': ram_history,

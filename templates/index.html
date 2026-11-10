@@ -586,6 +586,7 @@
                     <svg class="gauge-svg" viewBox="0 0 120 70" id="ram-gauge-svg"></svg>
                     <div class="gauge-value" id="ram-val">--%</div>
                 </div>
+                <div class="stat-sub" id="ram-detail">-- GB / -- GB</div>
                 <div class="sparkline-container">
                     <svg class="sparkline-svg" viewBox="0 0 200 40">
                         <polyline id="ram-sparkline" class="sparkline-path ram-path" points="" />
@@ -599,6 +600,7 @@
                     <svg class="gauge-svg" viewBox="0 0 120 70" id="disk-gauge-svg"></svg>
                     <div class="gauge-value" id="disk-val">--%</div>
                 </div>
+                <div class="stat-sub" id="disk-detail">-- GB / -- GB</div>
                 <div class="sparkline-container">
                     <svg class="sparkline-svg" viewBox="0 0 200 40">
                         <polyline id="disk-sparkline" class="sparkline-path disk-path" points="" />
@@ -875,10 +877,14 @@
                     updateSparkline(data.temp_history, 'temp-sparkline', 20, 85);
 
                     document.getElementById('ram-val').innerText = data.ram_percent + '%';
+                    document.getElementById('ram-detail').innerText =
+                        `${data.ram_used.toFixed(1)} GB / ${data.ram_total.toFixed(1)} GB využito`;
                     renderGauge('ram-gauge-svg', data.ram_percent);
                     updateSparkline(data.ram_history, 'ram-sparkline', 0, 100);
 
                     document.getElementById('disk-val').innerText = data.system.disk_percent + '%';
+                    document.getElementById('disk-detail').innerText =
+                        `${data.system.disk_used.toFixed(1)} GB / ${data.system.disk_total.toFixed(1)} GB využito`;
                     renderGauge('disk-gauge-svg', data.system.disk_percent);
 
                     diskHistory.push(data.system.disk_percent);
