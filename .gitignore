@@ -1,18 +1,14 @@
-__pycache__/
-*.py[cod]
-*$py.class
-
 .env
 .env.*
+!.env.example
 
-.vscode/
-.idea/
+t212_midnight.json
+
+__pycache__/
+*.py[cod]
+*.pyo
 
 venv/
-env/
-ENV/
 .venv/
 
-*.log
-instance/
-.webassets-cache
+.DS_Store

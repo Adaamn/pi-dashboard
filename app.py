@@ -1,4 +1,7 @@
 import os
+import re
+import html
+import json
 import psutil
 import requests
 import xml.etree.ElementTree as ET
@@ -27,31 +30,78 @@ def get_temperature():
     except:
         return 0.0
 
-def get_crypto_price():
-    try:
-        url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
-        res = requests.get(url, timeout=3).json()
-        return res['bitcoin']['usd']
-    except:
-        return 'N/A'
+t212_cache = {"data": None, "last_updated": None}
+T212_SNAPSHOT_FILE = 't212_midnight.json'
 
-def get_f1_next_race():
+def get_trading212_data():
+    global t212_cache
+    now = datetime.now()
+
+    if t212_cache["last_updated"] and (now - t212_cache["last_updated"]).total_seconds() < 60:
+        return t212_cache["data"]
+
+    key = os.getenv('TRADING212_API_KEY')
+    secret = os.getenv('TRADING212_API_SECRET')
+    if not key or not secret:
+        return None
+
     try:
-        url = 'https://api.jolpi.ca/ergast/f1/current/next.json'
-        res = requests.get(url, timeout=3).json()
-        race = res['MRData']['RaceTable']['Races'][0]
-        
-        date_str = race['date']
-        time_str = race.get('time', '14:00:00Z')
-        iso_datetime = f"{date_str}T{time_str}"
-        
+        res = requests.get(
+            'https://live.trading212.com/api/v0/equity/account/summary',
+            auth=(key, secret),
+            timeout=4
+        )
+        res.raise_for_status()
+        inv = res.json().get('investments', {})
+
+        invested = inv.get('totalCost', 0) or 0
+        current = inv.get('currentValue', 0) or 0
+        profit = inv.get('unrealizedProfitLoss', 0) or 0
+
+        alltime_percent = (profit / invested * 100) if invested else 0
+
+        today = now.strftime('%Y-%m-%d')
+        snapshot = None
+        try:
+            with open(T212_SNAPSHOT_FILE, 'r') as f:
+                snapshot = json.load(f)
+        except Exception:
+            pass
+
+        if not snapshot or snapshot.get('date') != today:
+            snapshot = {'date': today, 'profit': profit, 'current': current}
+            with open(T212_SNAPSHOT_FILE, 'w') as f:
+                json.dump(snapshot, f)
+
+        base = snapshot['current']
+        today_percent = ((profit - snapshot['profit']) / base * 100) if base else 0
+
+        data = {
+            'alltime_percent': alltime_percent,
+            'today_percent': today_percent
+        }
+        t212_cache["data"] = data
+        t212_cache["last_updated"] = now
+        return data
+    except Exception as e:
+        print(f"Trading212 chyba: {e}")
+        return t212_cache["data"]
+
+
+def get_crypto_data():
+    try:
+        url = 'https://api.coingecko.com/api/v3/coins/markets'
+        params = {'vs_currency': 'usd', 'ids': 'bitcoin', 'price_change_percentage': '7d'}
+        d = requests.get(url, params=params, timeout=3).json()[0]
         return {
-            'name': race['raceName'],
-            'datetime': iso_datetime,
-            'circuit': race['Circuit']['circuitName']
+            'price': d['current_price'],
+            'change_24h': d['price_change_percentage_24h'],
+            'change_7d': d.get('price_change_percentage_7d_in_currency'),
+            'ath': d['ath'],
+            'ath_change': d['ath_change_percentage']
         }
     except:
-        return {'name': 'Sezóna skončila / Offline', 'datetime': '', 'circuit': ''}
+        return None
 
 def get_system_stats():
     try:
@@ -75,7 +125,7 @@ def get_system_stats():
     except:
         return {'disk_percent': 0, 'disk_used': 0, 'disk_total': 0, 'uptime': 'N/A'}
 
-def get_financial_news():
+def get_news():
     try:
         url = 'https://www.seznamzpravy.cz/rss/nejnovejsi'
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -175,11 +225,47 @@ def get_calendar_events():
     except Exception as e:
         return [{'title': 'Chyba načítání kalendáře', 'time': ''}]
 
+def get_stock_news():
+    try:
+        url = 'https://www.kurzy.cz/zpravy/util/forext.dat?type=rss&col=wzAkcieSvet'
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.get(url, headers=headers, timeout=3)
+
+        if response.status_code == 200:
+            try:
+                text = response.content.decode('utf-8')
+            except UnicodeDecodeError:
+                text = response.content.decode('windows-1250', errors='replace')
+
+            items = re.findall(r'<item>(.*?)</item>', text, re.DOTALL)
+
+            if items:
+                item = items[0]
+                title = re.search(r'<title>(.*?)</title>', item, re.DOTALL)
+                desc = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
+
+                def clean(text):
+                    text = text.replace('<![CDATA[', '').replace(']]>', '')
+                    text = re.sub(r'<[^>]+>', '', text)
+                    return html.unescape(text).strip()
+
+                title_text = clean(title.group(1)) if title else "Aktuální zpráva"
+                desc_text = clean(desc.group(1)) if desc else ""
+
+                return {
+                    'title': title_text,
+                    'description': desc_text[:300] + '...' if len(desc_text) > 300 else desc_text
+                }
+    except Exception as e:
+        print(f"Chyba při načítání akciových zpráv: {e}")
+
+    return {'title': 'Trhy jsou v pohybu', 'description': 'Sledujeme aktuální vývoj na akciových trzích.'}
+
 def get_ai_daily_brief():
     global ai_summary_cache
     now = datetime.now()
     
-    if ai_summary_cache["last_updated"] and (now - ai_summary_cache["last_updated"]).total_seconds() < 6 * 3600:
+    if ai_summary_cache["last_updated"] and (now - ai_summary_cache["last_updated"]).total_seconds() < 3600:
         return ai_summary_cache["text"]
 
     api_key = os.getenv('ANTHROPIC_API_KEY')
@@ -188,8 +274,8 @@ def get_ai_daily_brief():
 
     try:
         weather = get_weather()
-        f1 = get_f1_next_race()
-        news = get_financial_news()
+        stock_news = get_stock_news()
+        news = get_news()
         calendar = get_calendar_events()
 
         now_dt = datetime.now()
@@ -225,25 +311,25 @@ Právě teď je: {now_str}
 Data z mého systému:
 - Počasí: 
 {weather['temp']}°C, {weather['desc']}
-- Nadcházející závod F1: 
-{f1['name']}
+- Zprávy z akciových trhů:
+{stock_news['title']}: {stock_news['description']}
 - Aktuální zpráva: 
-{news['title']}
+{news['title']}: {news['description']}
 - Kalendář:
 {calendar_text}
 
 Pravidla pro výstup:
 1. TÓN: Buď neformální parťák, tykej mi, piš přirozeně a lidsky.
-2. FOKUS: Zaměř se HLAVNĚ na dnešek a nejbližší 2-3 dny.
+2. FOKUS: Zaměř se HLAVNĚ na dnešek a nejbližší 2-3 dny. Do shrnutí krátce zahrň i novinky z akciových trhů.
 3. FAKTA: Vycházej STRICTNĚ a POUZE z poskytnutých dat. Nic si nevymýšlej.
 4. DNY: Ber den přesně tak, jak je napsaný na začátku řádku kalendáře. Pokud tam stojí POZÍTŘÍ, napiš "pozítří", nikdy ne "zítra". Dnes je jediná událost, která není zítra, pokud u ní není ZÍTRA.
 5. FORMÁT: Piš čistě obyčejným textem. NIKDY nepoužívej hvězdičky ani tučné písmo (**). Pro lepší přehlednost můžeš používat odrážky (-).
 6. DÉLKA: Piš podle potřeby, minimálně však 4 věty, horní limit není dán."""
-        
+
         client = anthropic.Anthropic(api_key=api_key)
         response = client.messages.create(
             model="claude-haiku-5-5",
-            max_tokens=1024,
+            max_tokens=1500,
             thinking={"type": "disabled"},
             messages=[{"role": "user", "content": prompt}]
         )
@@ -294,11 +380,12 @@ def hardware_stats():
 @app.route('/api/external')
 def external_stats():
     return jsonify({
-        'btc_price': get_crypto_price(),
-        'f1': get_f1_next_race(),
-        'news': get_financial_news(),
+        'btc': get_crypto_data(),
+        'news': get_news(),
+        'stock_news': get_stock_news(),
         'weather': get_weather(),
         'calendar': get_calendar_events(),
+        'trading212': get_trading212_data(),
         'ai_brief': get_ai_daily_brief(),
         'ai_brief_time': ai_summary_cache["last_updated"].strftime("%H:%M") if ai_summary_cache["last_updated"] else ''
     })
