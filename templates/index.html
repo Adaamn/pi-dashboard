@@ -878,13 +878,13 @@
 
                     document.getElementById('ram-val').innerText = data.ram_percent + '%';
                     document.getElementById('ram-detail').innerText =
-                        `${data.ram_used.toFixed(1)} GB / ${data.ram_total.toFixed(1)} GB využito`;
+                        `${data.ram_used.toFixed(1)} GB / ${data.ram_total.toFixed(1)} GB`;
                     renderGauge('ram-gauge-svg', data.ram_percent);
                     updateSparkline(data.ram_history, 'ram-sparkline', 0, 100);
 
                     document.getElementById('disk-val').innerText = data.system.disk_percent + '%';
                     document.getElementById('disk-detail').innerText =
-                        `${data.system.disk_used.toFixed(1)} GB / ${data.system.disk_total.toFixed(1)} GB využito`;
+                        `${data.system.disk_used.toFixed(1)} GB / ${data.system.disk_total.toFixed(1)} GB`;
                     renderGauge('disk-gauge-svg', data.system.disk_percent);
 
                     diskHistory.push(data.system.disk_percent);
