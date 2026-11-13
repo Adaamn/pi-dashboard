@@ -3,3 +3,4 @@ psutil==5.9.8
 requests
 python-dotenv
 anthropic
+yfinance

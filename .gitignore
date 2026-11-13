@@ -3,6 +3,8 @@
 !.env.example
 
 t212_midnight.json
+t212_sector_cache.json
+t212_instruments_cache.json
 
 __pycache__/
 *.py[cod]

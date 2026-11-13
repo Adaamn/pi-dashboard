@@ -6,11 +6,13 @@ import psutil
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
+import yfinance as yf
 from flask import Flask, jsonify, render_template
 from dotenv import load_dotenv
 import anthropic
 
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 app = Flask(__name__)
 
@@ -23,6 +25,55 @@ ai_summary_cache = {
     "last_updated": None
 }
 
+YAHOO_HEADERS = {
+    'User-Agent': (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/122.0.0.0 Safari/537.36'
+    )
+}
+
+T212_EXCHANGE_YAHOO = {
+    'US': '',
+    'UK': '.L',
+    'GB': '.L',
+    'LSE': '.L',
+    'DE': '.DE',
+    'NL': '.AS',
+    'FR': '.PA',
+    'IT': '.MI',
+    'ES': '.MC',
+    'BE': '.BR',
+    'PT': '.LS',
+    'IE': '.IR',
+    'CH': '.SW',
+    'AT': '.VI',
+    'SE': '.ST',
+    'NO': '.OL',
+    'DK': '.CO',
+    'FI': '.HE',
+    'PL': '.WA',
+    'CZ': '.PR',
+    'AU': '.AX',
+    'CA': '.TO',
+    'JP': '.T',
+    'HK': '.HK',
+    'SG': '.SI',
+}
+
+NAME_STOPWORDS = {
+    'inc', 'inc.', 'corp', 'corp.', 'corporation', 'ltd', 'ltd.', 'limited',
+    'plc', 'sa', 'ag', 'nv', 'se', 'class', 'ordinary', 'ordinary-shs',
+    'shares', 'share', 'stock', 'common', 'the', 'co', 'co.', 'company',
+    'holdings', 'holding', 'group', 'adr', 'ads'
+}
+
+ETF_TYPES = {
+    'ETF', 'ETFS', 'ETC', 'ETN', 'FUND', 'FUNDS', 'MUTUALFUND',
+    'MUTUAL_FUND', 'INVESTMENTTRUST', 'INVESTMENT_TRUST'
+}
+
+
 def get_temperature():
     try:
         with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
@@ -31,7 +82,7 @@ def get_temperature():
         return 0.0
 
 t212_cache = {"data": None, "last_updated": None}
-T212_SNAPSHOT_FILE = 't212_midnight.json'
+T212_SNAPSHOT_FILE = os.path.join(BASE_DIR, 't212_midnight.json')
 
 def get_trading212_data():
     global t212_cache
@@ -86,6 +137,645 @@ def get_trading212_data():
     except Exception as e:
         print(f"Trading212 chyba: {e}")
         return t212_cache["data"]
+
+
+
+T212_SECTOR_CACHE_FILE = os.path.join(BASE_DIR, 't212_sector_cache.json')
+T212_INSTRUMENTS_CACHE_FILE = os.path.join(BASE_DIR, 't212_instruments_cache.json')
+SECTOR_MISS_RETRY_HOURS = 24
+SECTOR_LOOKUP_BUDGET_SECONDS = 12
+t212_sector_cache = None
+t212_sector_cache_loaded = False
+t212_sectors_result_cache = {"data": None, "last_updated": None}
+t212_instruments_mem = {"data": None, "last_updated": None}
+
+
+SECTOR_NAMES = {
+    'Technology': 'Technologie',
+    'Communication Services': 'Komunikační služby',
+    'Consumer Cyclical': 'Spotřební zboží',
+    'Consumer Defensive': 'Základní spotřeba',
+    'Healthcare': 'Zdravotnictví',
+    'Financial Services': 'Finance',
+    'Financial': 'Finance',
+    'Industrials': 'Průmysl',
+    'Industrial': 'Průmysl',
+    'Basic Materials': 'Základní materiály',
+    'Energy': 'Energetika',
+    'Real Estate': 'Nemovitosti',
+    'Utilities': 'Veřejné služby'
+}
+
+
+def load_sector_cache():
+    global t212_sector_cache, t212_sector_cache_loaded
+
+    if t212_sector_cache_loaded:
+        return t212_sector_cache
+
+    try:
+        with open(T212_SECTOR_CACHE_FILE, 'r', encoding='utf-8') as f:
+            t212_sector_cache = json.load(f)
+            if not isinstance(t212_sector_cache, dict):
+                t212_sector_cache = {}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        t212_sector_cache = {}
+
+    t212_sector_cache_loaded = True
+    return t212_sector_cache
+
+
+def save_sector_cache():
+    try:
+        with open(T212_SECTOR_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(t212_sector_cache, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        print(f"Chyba ukládání sektorové cache: {e}")
+
+
+def parse_cache_time(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def cached_classification(ticker):
+    cache = load_sector_cache()
+    entry = cache.get(ticker)
+    if not isinstance(entry, dict):
+        return None, False
+
+    sector = entry.get('sector')
+    status = entry.get('status')
+    if not status:
+        status = 'ok' if sector else 'miss'
+
+    if status == 'ok' and sector:
+        return sector, True
+
+    updated = parse_cache_time(entry.get('updated'))
+    if updated and datetime.now() - updated < timedelta(hours=SECTOR_MISS_RETRY_HOURS):
+        return None, True
+
+    return None, False
+
+
+def store_classification(ticker, sector, name):
+    cache = load_sector_cache()
+    cache[ticker] = {
+        'sector': sector,
+        'name': name or ticker,
+        'status': 'ok' if sector else 'miss',
+        'updated': datetime.now().isoformat(timespec='seconds')
+    }
+    save_sector_cache()
+
+
+def t212_auth():
+    key = os.getenv('TRADING212_API_KEY')
+    secret = os.getenv('TRADING212_API_SECRET')
+    if not key or not secret:
+        return None
+    return (key, secret)
+
+
+def t212_get_json(url, timeout=10):
+    auth = t212_auth()
+    if not auth:
+        return None
+
+    response = requests.get(url, auth=auth, timeout=timeout)
+    response.raise_for_status()
+    return response.json()
+
+
+def normalize_name(value):
+    if not value:
+        return ''
+    value = html.unescape(str(value)).lower()
+    value = re.sub(r'[^a-z0-9]+', ' ', value)
+    tokens = [t for t in value.split() if t and t not in NAME_STOPWORDS]
+    return ' '.join(tokens)
+
+
+def names_compatible(left, right):
+    a = normalize_name(left)
+    b = normalize_name(right)
+    if not a or not b:
+        return False
+    if a == b or a in b or b in a:
+        return True
+    tokens_a = set(a.split())
+    tokens_b = set(b.split())
+    if not tokens_a or not tokens_b:
+        return False
+    overlap = tokens_a & tokens_b
+    return len(overlap) / min(len(tokens_a), len(tokens_b)) >= 0.5
+
+
+def unique_keep_order(items):
+    seen = set()
+    result = []
+    for item in items:
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+def yahoo_symbols_from_t212(ticker):
+    if not ticker:
+        return []
+
+    raw = str(ticker).strip()
+    core = re.sub(r'(_EQ)+$', '', raw, flags=re.IGNORECASE)
+    exch = None
+
+    if '_' in core:
+        maybe_symbol, maybe_exch = core.rsplit('_', 1)
+        if maybe_exch.upper() in T212_EXCHANGE_YAHOO:
+            exch = maybe_exch.upper()
+            core = maybe_symbol
+
+    dotted = core.replace('_', '.')
+    hyphen = core.replace('.', '-').replace('_', '-')
+    suffix = T212_EXCHANGE_YAHOO.get(exch, '')
+
+    symbols = []
+    for base in (hyphen, dotted, core):
+        if suffix:
+            symbols.append(base + suffix)
+        symbols.append(base)
+
+    return unique_keep_order(symbols)
+
+
+def translate_sector(sector):
+    if not sector:
+        return None
+    return SECTOR_NAMES.get(sector, sector)
+
+
+def classification_from_quote_meta(quote_type, sector, t212_type):
+    qt = (quote_type or '').upper()
+    tt = (t212_type or '').upper()
+
+    if qt in ETF_TYPES or tt in ETF_TYPES:
+        return 'ETF / fondy'
+    if qt in ('EQUITY', 'STOCK', '') or tt in ('STOCK', 'EQUITY', 'SHARES', ''):
+        return translate_sector(sector)
+    if sector and qt not in ('INDEX', 'CURRENCY', 'CRYPTOCURRENCY', 'OPTION', 'FUTURE'):
+        return translate_sector(sector)
+    return None
+
+
+def yahoo_quote_summary(symbol):
+    try:
+        response = requests.get(
+            f'https://query1.finance.yahoo.com/v10/finance/quoteSummary/{symbol}',
+            params={'modules': 'assetProfile,summaryProfile,price'},
+            headers=YAHOO_HEADERS,
+            timeout=8
+        )
+        if response.status_code != 200:
+            return None
+
+        payload = response.json() or {}
+        result = (payload.get('quoteSummary') or {}).get('result') or []
+        if not result:
+            return None
+
+        item = result[0]
+        profile = item.get('assetProfile') or item.get('summaryProfile') or {}
+        price = item.get('price') or {}
+        return {
+            'symbol': price.get('symbol') or symbol,
+            'quoteType': price.get('quoteType'),
+            'shortName': price.get('shortName'),
+            'longName': price.get('longName'),
+            'sector': profile.get('sector'),
+            'isin': profile.get('isin')
+        }
+    except Exception as e:
+        print(f"Yahoo quoteSummary chyba ({symbol}): {e}")
+        return None
+
+
+def yfinance_ticker_meta(symbol):
+    try:
+        info = yf.Ticker(symbol).info or {}
+        if not info:
+            return None
+        if not any(info.get(k) for k in ('symbol', 'shortName', 'longName', 'sector', 'quoteType')):
+            return None
+        return {
+            'symbol': info.get('symbol') or symbol,
+            'quoteType': info.get('quoteType'),
+            'shortName': info.get('shortName') or info.get('shortname'),
+            'longName': info.get('longName') or info.get('longname'),
+            'sector': info.get('sector') or info.get('sectorDisp'),
+            'isin': info.get('isin')
+        }
+    except Exception as e:
+        print(f"yfinance chyba ({symbol}): {e}")
+        return None
+
+
+def yahoo_search_quotes(query):
+    if not query:
+        return []
+
+    quotes = []
+
+    try:
+        response = requests.get(
+            'https://query1.finance.yahoo.com/v1/finance/search',
+            params={'q': query, 'quotesCount': 10, 'newsCount': 0},
+            headers=YAHOO_HEADERS,
+            timeout=8
+        )
+        if response.status_code == 200:
+            quotes = (response.json() or {}).get('quotes') or []
+    except Exception as e:
+        print(f"Yahoo search chyba ({query}): {e}")
+
+    if not quotes:
+        try:
+            search = yf.Search(query, max_results=10)
+            quotes = search.quotes or []
+        except Exception as e:
+            print(f"yfinance Search chyba ({query}): {e}")
+
+    return quotes
+
+
+def meta_matches_instrument(meta, name, isin, require_identity):
+    if not meta:
+        return False
+
+    meta_isin = (meta.get('isin') or '').replace(' ', '').upper()
+    if isin and meta_isin and meta_isin == isin.replace(' ', '').upper():
+        return True
+
+    yahoo_names = [meta.get('longName'), meta.get('shortName')]
+    if name and any(names_compatible(name, candidate) for candidate in yahoo_names if candidate):
+        return True
+
+    return not require_identity
+
+
+def classify_from_meta(meta, name, isin, t212_type, require_identity):
+    if not meta_matches_instrument(meta, name, isin, require_identity):
+        return None
+    return classification_from_quote_meta(
+        meta.get('quoteType'),
+        meta.get('sector'),
+        t212_type
+    )
+
+
+def classify_yahoo_symbol(symbol, name, isin, t212_type, require_identity):
+    meta = yahoo_quote_summary(symbol)
+    sector = classify_from_meta(meta, name, isin, t212_type, require_identity)
+    if sector:
+        return sector
+
+    meta = yfinance_ticker_meta(symbol)
+    return classify_from_meta(meta, name, isin, t212_type, require_identity)
+
+
+def best_search_matches(quotes, name, isin):
+    ranked = []
+    for quote in quotes:
+        quote_type = (quote.get('quoteType') or '').upper()
+        if quote_type not in ('EQUITY', 'ETF', 'MUTUALFUND', 'ETC', 'INDEX', ''):
+            continue
+
+        symbol = quote.get('symbol')
+        if not symbol:
+            continue
+
+        score = 0
+        quote_isin = (quote.get('isin') or '').replace(' ', '').upper()
+        if isin and quote_isin and quote_isin == isin.replace(' ', '').upper():
+            score += 5
+
+        longname = quote.get('longname') or quote.get('longName') or ''
+        shortname = quote.get('shortname') or quote.get('shortName') or ''
+        if name and names_compatible(name, longname):
+            score += 3
+        if name and names_compatible(name, shortname):
+            score += 2
+
+        if score <= 0:
+            continue
+
+        ranked.append((score, symbol, quote_type))
+
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    return ranked
+
+
+def find_instrument_sector(ticker, name, isin, inst_type):
+    t212_type = (inst_type or '').upper()
+    if t212_type in ETF_TYPES:
+        return 'ETF / fondy'
+
+    for symbol in yahoo_symbols_from_t212(ticker):
+        sector = classify_yahoo_symbol(
+            symbol,
+            name,
+            isin,
+            t212_type,
+            require_identity=False
+        )
+        if sector:
+            return sector
+
+    queries = unique_keep_order([
+        (isin or '').replace(' ', ''),
+        name,
+        ticker
+    ])
+
+    for query in queries:
+        quotes = yahoo_search_quotes(query)
+        matches = best_search_matches(quotes, name, isin)
+        for _score, symbol, quote_type in matches[:3]:
+            if (quote_type or '').upper() in ETF_TYPES:
+                return 'ETF / fondy'
+            sector = classify_yahoo_symbol(
+                symbol,
+                name,
+                isin,
+                t212_type,
+                require_identity=True
+            )
+            if sector:
+                return sector
+
+    return None
+
+
+def load_instruments_cache_file():
+    try:
+        with open(T212_INSTRUMENTS_CACHE_FILE, 'r', encoding='utf-8') as f:
+            payload = json.load(f)
+        if isinstance(payload, dict) and isinstance(payload.get('data'), dict):
+            return payload
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+    return None
+
+
+def save_instruments_cache_file(data):
+    try:
+        with open(T212_INSTRUMENTS_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(
+                {
+                    'last_updated': datetime.now().isoformat(timespec='seconds'),
+                    'data': data
+                },
+                f,
+                ensure_ascii=False
+            )
+    except OSError as e:
+        print(f"Chyba ukládání cache instrumentů: {e}")
+
+
+def get_t212_instruments_map():
+    now = datetime.now()
+    if (
+        t212_instruments_mem["data"] is not None
+        and t212_instruments_mem["last_updated"]
+        and (now - t212_instruments_mem["last_updated"]).total_seconds() < 6 * 3600
+    ):
+        return t212_instruments_mem["data"]
+
+    file_cache = load_instruments_cache_file()
+    if file_cache:
+        updated = parse_cache_time(file_cache.get('last_updated'))
+        if updated and now - updated < timedelta(hours=24):
+            t212_instruments_mem["data"] = file_cache['data']
+            t212_instruments_mem["last_updated"] = updated
+            return file_cache['data']
+
+    mapping = {}
+    try:
+        payload = t212_get_json(
+            'https://live.trading212.com/api/v0/equity/metadata/instruments',
+            timeout=20
+        )
+        instruments = payload
+        if isinstance(payload, dict):
+            instruments = (
+                payload.get('items')
+                or payload.get('instruments')
+                or payload.get('data')
+                or []
+            )
+        if isinstance(instruments, list):
+            for item in instruments:
+                ticker = item.get('ticker')
+                if ticker:
+                    mapping[ticker] = item
+            save_instruments_cache_file(mapping)
+            t212_instruments_mem["data"] = mapping
+            t212_instruments_mem["last_updated"] = now
+            return mapping
+    except Exception as e:
+        print(f"Trading212 instrumenty chyba: {e}")
+
+    if file_cache and file_cache.get('data'):
+        t212_instruments_mem["data"] = file_cache['data']
+        t212_instruments_mem["last_updated"] = now
+        return file_cache['data']
+
+    t212_instruments_mem["data"] = mapping
+    t212_instruments_mem["last_updated"] = now
+    return mapping
+
+
+def fetch_t212_positions():
+    urls = (
+        'https://live.trading212.com/api/v0/equity/positions',
+        'https://live.trading212.com/api/v0/equity/portfolio',
+    )
+    last_error = None
+
+    for url in urls:
+        try:
+            payload = t212_get_json(url, timeout=10)
+            if isinstance(payload, list):
+                return payload
+            if isinstance(payload, dict):
+                positions = (
+                    payload.get('positions')
+                    or payload.get('items')
+                    or payload.get('data')
+                    or payload.get('portfolio')
+                )
+                if isinstance(positions, list):
+                    return positions
+        except Exception as e:
+            last_error = e
+            print(f"Trading212 pozice chyba ({url}): {e}")
+
+    if last_error:
+        raise last_error
+    return None
+
+
+def position_market_value(position):
+    for key in ('currentValue', 'value', 'result', 'marketValue'):
+        if position.get(key) not in (None, ''):
+            try:
+                return float(position.get(key) or 0)
+            except (TypeError, ValueError):
+                pass
+
+    wallet = position.get('walletImpact')
+    if isinstance(wallet, dict) and wallet.get('currentValue') not in (None, ''):
+        try:
+            return float(wallet.get('currentValue') or 0)
+        except (TypeError, ValueError):
+            pass
+
+    try:
+        quantity = float(position.get('quantity') or 0)
+        price = float(position.get('currentPrice') or 0)
+        return quantity * price
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def extract_position_instrument(position, instruments_map):
+    instrument = position.get('instrument')
+    if not isinstance(instrument, dict):
+        instrument = {}
+
+    ticker = (
+        position.get('ticker')
+        or instrument.get('ticker')
+        or position.get('code')
+        or instrument.get('code')
+    )
+    meta = instruments_map.get(ticker, {}) if ticker else {}
+
+    name = (
+        instrument.get('name')
+        or position.get('name')
+        or meta.get('name')
+        or meta.get('shortName')
+        or ''
+    )
+    isin = (
+        instrument.get('isin')
+        or position.get('isin')
+        or meta.get('isin')
+        or ''
+    )
+    inst_type = (
+        instrument.get('type')
+        or position.get('type')
+        or meta.get('type')
+        or ''
+    )
+
+    return ticker, name, isin, inst_type
+
+
+def round_sector_percents(sector_totals, portfolio_total):
+    items = [
+        (name, value / portfolio_total * 100)
+        for name, value in sector_totals.items()
+        if value > 0
+    ]
+    if not items:
+        return []
+
+    rounded = [round(percent, 1) for _, percent in items]
+    drift = round(100 - sum(rounded), 1)
+    if rounded:
+        largest = max(range(len(rounded)), key=lambda i: items[i][1])
+        rounded[largest] = round(rounded[largest] + drift, 1)
+
+    result = [
+        {'name': items[i][0], 'percent': rounded[i]}
+        for i in range(len(items))
+        if rounded[i] > 0
+    ]
+    return sorted(result, key=lambda item: item['percent'], reverse=True)
+
+
+def get_trading212_sectors():
+    global t212_sector_cache
+
+    now = datetime.now()
+    cached_result = t212_sectors_result_cache["data"]
+    last_updated = t212_sectors_result_cache["last_updated"]
+    if cached_result is not None and last_updated and (now - last_updated).total_seconds() < 60:
+        return cached_result
+
+    try:
+        if not t212_auth():
+            return None
+
+        positions = fetch_t212_positions()
+        if not isinstance(positions, list):
+            return None
+
+        instruments_map = get_t212_instruments_map()
+        load_sector_cache()
+
+        sector_totals = {}
+        portfolio_total = 0
+        lookup_started = datetime.now()
+
+        for position in positions:
+            ticker, name, isin, inst_type = extract_position_instrument(
+                position,
+                instruments_map
+            )
+            value = position_market_value(position)
+
+            if not ticker or value <= 0:
+                continue
+
+            portfolio_total += value
+
+            sector, trusted = cached_classification(ticker)
+            if not trusted:
+                elapsed = (datetime.now() - lookup_started).total_seconds()
+                if elapsed < SECTOR_LOOKUP_BUDGET_SECONDS:
+                    sector = find_instrument_sector(ticker, name, isin, inst_type)
+                    store_classification(ticker, sector, name)
+                else:
+                    sector = None
+
+            if not sector:
+                sector = 'Nezařazeno'
+
+            sector_totals[sector] = sector_totals.get(sector, 0) + value
+
+        if portfolio_total <= 0:
+            result = []
+        else:
+            result = round_sector_percents(sector_totals, portfolio_total)
+
+        t212_sectors_result_cache["data"] = result
+        t212_sectors_result_cache["last_updated"] = now
+        return result
+
+    except Exception as e:
+        print(f"Trading212 sektory chyba: {e}")
+        if t212_sectors_result_cache["data"] is not None:
+            return t212_sectors_result_cache["data"]
+        return None
 
 
 def get_crypto_data():
@@ -231,8 +921,6 @@ def get_calendar_events():
                         continue
 
                     if all_day:
-                        # DTEND je u celodenních událostí v ICS
-                        # poslední den EXKLUZIVNÍ.
                         if end:
                             display_end = end - timedelta(days=1)
                         else:
@@ -273,7 +961,6 @@ def get_calendar_events():
                         event_start = start
                         event_end = end
 
-                    # Zobrazit události, které ještě neskončily.
                     if event_end >= now:
                         events.append({
                             'title': summary,
@@ -496,8 +1183,10 @@ def external_stats():
         'weather': get_weather(),
         'calendar': get_calendar_events(),
         'trading212': get_trading212_data(),
+        'trading212_sectors': get_trading212_sectors(),
         'ai_brief': get_ai_daily_brief(),
         'ai_brief_time': ai_summary_cache["last_updated"].strftime("%H:%M") if ai_summary_cache["last_updated"] else ''
+        
     })
 
 if __name__ == '__main__':
