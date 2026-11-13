@@ -552,6 +552,91 @@
                 overflow: visible;
             }
         }
+
+
+
+        .calendar-summary {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            width: 100%;
+            margin-bottom: 8px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .calendar-summary div {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .calendar-summary strong {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-main);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .calendar-summary span {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .calendar-item-badge {
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.7px;
+            margin-bottom: 5px;
+            color: #a78bfa;
+        }
+
+        .calendar-item.today {
+            background: rgba(63, 185, 80, 0.08);
+            border-color: rgba(63, 185, 80, 0.2);
+        }
+
+        .calendar-item.today::before {
+            background: var(--accent-green);
+        }
+
+        .calendar-item.today .calendar-item-badge {
+            color: var(--accent-green);
+        }
+
+        .calendar-item.tomorrow::before {
+            background: var(--accent-blue);
+        }
+
+        .calendar-item.tomorrow .calendar-item-badge {
+            color: var(--accent-blue);
+        }
+
+        .calendar-item.future::before {
+            background: #a78bfa;
+        }
+
+        .calendar-item.future .calendar-item-badge {
+            color: #a78bfa;
+        }
+
+        @media (min-width: 1200px) {
+            .calendar-summary {
+                margin-bottom: 6px;
+                padding-bottom: 9px;
+            }
+
+            .calendar-summary strong {
+                font-size: 19px;
+            }
+
+            .calendar-item-badge {
+                font-size: 9px;
+                margin-bottom: 3px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -945,13 +1030,129 @@
                     if (data.calendar && Array.isArray(data.calendar)) {
                         const calContainer = document.getElementById('calendar-list');
                         calContainer.innerHTML = '';
-                        data.calendar.forEach(ev => {
+
+                        const pragueDate = new Intl.DateTimeFormat('en-CA', {
+                            timeZone: 'Europe/Prague',
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        }).format(new Date());
+
+                        const [year, month, day] = pragueDate.split('-').map(Number);
+
+                        const today = new Date(year, month - 1, day);
+                        const tomorrow = new Date(year, month - 1, day + 1);
+
+                        const saturday = new Date(today);
+                        const daysUntilSaturday = today.getDay() === 0
+                            ? -1
+                            : 6 - today.getDay();
+
+                        saturday.setDate(saturday.getDate() + daysUntilSaturday);
+
+                        const sunday = new Date(saturday);
+                        sunday.setDate(sunday.getDate() + 1);
+
+                        function parseCalendarDate(value) {
+                            const datePart = value.substring(0, 10);
+                            const [y, m, d] = datePart.split('-').map(Number);
+                            return new Date(y, m - 1, d);
+                        }
+
+                        const events = data.calendar.map(ev => {
+                            const start = parseCalendarDate(ev.start_date);
+                            const end = parseCalendarDate(ev.end_date);
+
+                            let label = '';
+                            let status = 'future';
+
+                            if (start <= today && end >= today) {
+                                label = 'DNES';
+                                status = 'today';
+                            } else if (start <= tomorrow && end >= tomorrow) {
+                                label = 'ZÍTRA';
+                                status = 'tomorrow';
+                            } else {
+                                const diff = Math.round(
+                                    (start - today) / (1000 * 60 * 60 * 24)
+                                );
+
+                            if (diff === 1) {
+                                label = 'ZA 1 DEN';
+                            } else if (diff >= 2 && diff <= 4) {
+                                label = `ZA ${diff} DNY`;
+                            } else {
+                                label = `ZA ${diff} DNÍ`;
+                            }
+                                status = 'future';
+                            }
+
+                            return {
+                                ...ev,
+                                start,
+                                end,
+                                label,
+                                status
+                            };
+                        });
+
+                        const todayCount = events.filter(ev =>
+                            ev.start <= today && ev.end >= today
+                        ).length;
+
+                        const tomorrowCount = events.filter(ev =>
+                            ev.start <= tomorrow && ev.end >= tomorrow
+                        ).length;
+
+                        const weekendCount = events.filter(ev =>
+                            ev.start <= sunday && ev.end >= saturday
+                        ).length;
+
+                        const summary = document.createElement('div');
+                        summary.className = 'calendar-summary';
+
+                        const summaryItems = [
+                            { count: todayCount, label: 'Dnes' },
+                            { count: tomorrowCount, label: 'Zítra' },
+                            { count: weekendCount, label: 'Víkend' }
+                        ];
+
+                        summaryItems.forEach(stat => {
+                            const box = document.createElement('div');
+
+                            const number = document.createElement('strong');
+                            number.textContent = stat.count;
+
+                            const label = document.createElement('span');
+                            label.textContent = stat.label;
+
+                            box.appendChild(number);
+                            box.appendChild(label);
+                            summary.appendChild(box);
+                        });
+
+                        calContainer.appendChild(summary);
+
+                        events.forEach(ev => {
                             const item = document.createElement('div');
-                            item.className = 'calendar-item';
-                            item.innerHTML = `
-                                <div class="calendar-item-title">${ev.title}</div>
-                                <div class="calendar-item-time">${ev.time}</div>
-                            `;
+                            item.className = `calendar-item ${ev.status}`;
+
+                            const badge = document.createElement('div');
+                            badge.className = 'calendar-item-badge';
+                            badge.textContent = ev.label;
+
+                            const title = document.createElement('div');
+                            title.className = 'calendar-item-title';
+                            title.textContent = ev.title;
+
+                            const time = document.createElement('div');
+                            time.className = 'calendar-item-time';
+                            time.textContent = ev.time;
+
+                            item.appendChild(badge);
+                            item.appendChild(title);
+                            item.appendChild(time);
+
                             calContainer.appendChild(item);
                         });
                     }

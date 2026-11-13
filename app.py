@@ -174,61 +174,147 @@ def get_weather():
     except:
         return {'temp': '--', 'desc': 'Offline'}
 
+
 def get_calendar_events():
     try:
         ics_url = os.getenv('CALENDAR_ICS_URL')
-        
+
         if not ics_url:
-            return [{'title': 'Chybí CALENDAR_ICS_URL v .env', 'time': 'Zkontroluj konfiguraci'}]
+            return [{
+                'title': 'Chybí CALENDAR_ICS_URL v .env',
+                'time': 'Zkontroluj konfiguraci'
+            }]
 
         res = requests.get(ics_url, timeout=4)
+
         if res.status_code != 200:
             return [{'title': 'Kalendář nedostupný', 'time': ''}]
 
-        lines = res.text.splitlines()
+        lines = res.text.replace('\r\n ', '').replace('\n ', '').splitlines()
+
         events = []
         current_event = None
-        now = datetime.now(timezone.utc)
+        now = datetime.now().astimezone()
+
+        def parse_ics_date(value):
+            if not value:
+                return None, False
+
+            value = value.strip()
+
+            if 'T' not in value:
+                dt = datetime.strptime(value, '%Y%m%d')
+                return dt.date(), True
+
+            if value.endswith('Z'):
+                dt = datetime.strptime(value, '%Y%m%dT%H%M%SZ')
+                return dt.replace(tzinfo=timezone.utc).astimezone(), False
+
+            dt = datetime.strptime(value, '%Y%m%dT%H%M%S')
+            return dt.astimezone(), False
 
         for line in lines:
             if line.startswith('BEGIN:VEVENT'):
                 current_event = {}
-            elif line.startswith('END:VEVENT') and current_event:
+
+            elif line.startswith('END:VEVENT') and current_event is not None:
                 summary = current_event.get('SUMMARY', 'Bez názvu')
-                dtstart = current_event.get('DTSTART', '')
-                
-                parsed_time = None
+                start_value = current_event.get('DTSTART', '')
+                end_value = current_event.get('DTEND', '')
+
                 try:
-                    if 'T' in dtstart:
-                        dt_clean = dtstart.split('Z')[0]
-                        parsed_time = datetime.strptime(dt_clean, '%Y%m%dT%H%M%S').replace(tzinfo=timezone.utc)
-                        time_str = parsed_time.astimezone().strftime('%d.%m. %H:%M')
+                    start, all_day = parse_ics_date(start_value)
+                    end, _ = parse_ics_date(end_value)
+
+                    if start is None:
+                        current_event = None
+                        continue
+
+                    if all_day:
+                        # DTEND je u celodenních událostí v ICS
+                        # poslední den EXKLUZIVNÍ.
+                        if end:
+                            display_end = end - timedelta(days=1)
+                        else:
+                            display_end = start
+
+                        if display_end < start:
+                            display_end = start
+
+                        if display_end > start:
+                            time_str = (
+                                f"{start.strftime('%d.%m.')} – "
+                                f"{display_end.strftime('%d.%m.')} (Celý den)"
+                            )
+                        else:
+                            time_str = start.strftime('%d.%m. (Celý den)')
+
+                        event_start = datetime.combine(
+                            start, datetime.min.time()
+                        ).astimezone()
+
+                        event_end = datetime.combine(
+                            display_end + timedelta(days=1),
+                            datetime.min.time()
+                        ).astimezone()
+
                     else:
-                        parsed_time = datetime.strptime(dtstart, '%Y%m%d').replace(tzinfo=timezone.utc)
-                        time_str = parsed_time.strftime('%d.%m. (Celý den)')
-                    
-                    if 'T' in dtstart:
-                        cutoff = now - timedelta(hours=1)
-                    else:
-                        d = datetime.now().date()
-                        cutoff = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
-                    if parsed_time >= cutoff:
-                        events.append({'title': summary, 'time': time_str, 'raw': parsed_time})
-                except:
-                    pass
+                        if end is None:
+                            end = start
+
+                        if end > start:
+                            time_str = (
+                                f"{start.strftime('%d.%m. %H:%M')} – "
+                                f"{end.strftime('%d.%m. %H:%M')}"
+                            )
+                        else:
+                            time_str = start.strftime('%d.%m. %H:%M')
+
+                        event_start = start
+                        event_end = end
+
+                    # Zobrazit události, které ještě neskončily.
+                    if event_end >= now:
+                        events.append({
+                            'title': summary,
+                            'time': time_str,
+                            'raw': event_start,
+                            'start_date': start.isoformat(),
+                            'end_date': (
+                                end.isoformat() if end else start.isoformat()
+                            ) if not all_day else display_end.isoformat()
+                        })
+
+                except Exception as e:
+                    print(f"Chyba zpracování události: {e}")
+
                 current_event = None
-            elif current_event is not None:
-                if ':' in line:
-                    key, val = line.split(':', 1)
-                    key = key.split(';')[0]
-                    current_event[key] = val
+
+            elif current_event is not None and ':' in line:
+                key, val = line.split(':', 1)
+                key = key.split(';')[0]
+                current_event[key] = val
 
         events.sort(key=lambda x: x['raw'])
-        cleaned_events = [{'title': e['title'], 'time': e['time']} for e in events[:6]]
-        
-        return cleaned_events if cleaned_events else [{'title': 'Žádné nadcházející události', 'time': ''}]
+
+        cleaned_events = [
+            {
+                'title': e['title'],
+                'time': e['time'],
+                'start_date': e['start_date'],
+                'end_date': e['end_date']
+            }
+            for e in events[:6]
+        ]
+
+        return cleaned_events if cleaned_events else [
+            {'title': 'Žádné nadcházející události', 'time': ''}
+        ]
+
     except Exception as e:
+        print(f"Chyba načítání kalendáře: {e}")
         return [{'title': 'Chyba načítání kalendáře', 'time': ''}]
+
 
 def get_stock_news():
     try:
@@ -270,7 +356,7 @@ def get_ai_daily_brief():
     global ai_summary_cache
     now = datetime.now()
     
-    if ai_summary_cache["last_updated"] and (now - ai_summary_cache["last_updated"]).total_seconds() < 3600:
+    if ai_summary_cache["last_updated"] and (now - ai_summary_cache["last_updated"]).total_seconds() < 600:
         return ai_summary_cache["text"]
 
     api_key = os.getenv('ANTHROPIC_API_KEY')
@@ -287,25 +373,43 @@ def get_ai_daily_brief():
         today = now_dt.date()
         now_str = now_dt.strftime("%d.%m.%Y %H:%M")
 
+
+        
         cal_lines = []
+        today_date = datetime.now().date()
+
         for ev in calendar:
             try:
-                d, m = ev['time'].split(' ')[0].strip('.').split('.')
-                diff = (datetime(today.year, int(m), int(d)).date() - today).days
-                if diff > 3:
+                start_date = datetime.fromisoformat(ev['start_date']).date()
+                end_date = datetime.fromisoformat(ev['end_date']).date()
+
+                if start_date > today_date + timedelta(days=3):
                     continue
-                if diff <= 0:
+
+                if end_date < today_date:
+                    continue
+
+                if start_date < today_date:
+                    when = "PRÁVĚ PROBÍHÁ"
+                elif start_date == today_date:
                     when = "DNES"
-                elif diff == 1:
+                elif start_date == today_date + timedelta(days=1):
                     when = "ZÍTRA"
-                elif diff == 2:
+                elif start_date == today_date + timedelta(days=2):
                     when = "POZÍTŘÍ"
                 else:
-                    when = f"za {diff} dny"
-                cal_lines.append(f"- {when}: {ev['title']}")
-            except Exception:
-                cal_lines.append(f"- {ev['title']} ({ev['time']})")
+                    when = "ZA 3 DNY"
+
+                cal_lines.append(
+                    f"- {when}: {ev['title']} ({ev['time']})"
+                )
+
+            except Exception as e:
+                print(f"Chyba kalendáře pro AI: {e}")
+
         calendar_text = "\n".join(cal_lines) if cal_lines else "Nic v nejbližších třech dnech."
+
+
 
         user_name = os.getenv('USER_NAME', '')
         
@@ -327,7 +431,7 @@ Pravidla pro výstup:
 1. TÓN: Buď neformální parťák, tykej mi, piš přirozeně a lidsky.
 2. FOKUS: Zaměř se HLAVNĚ na dnešek a nejbližší 2-3 dny. Do shrnutí krátce zahrň i novinky z akciových trhů.
 3. FAKTA: Vycházej STRICTNĚ a POUZE z poskytnutých dat. Nic si nevymýšlej.
-4. DNY: Ber den přesně tak, jak je napsaný na začátku řádku kalendáře. Pokud tam stojí POZÍTŘÍ, napiš "pozítří", nikdy ne "zítra". Dnes je jediná událost, která není zítra, pokud u ní není ZÍTRA.
+4. KALENDÁŘ: Zachovej přesně označení dne z kalendáře (PRÁVĚ PROBÍHÁ, DNES, ZÍTRA, POZÍTŘÍ, ZA 3 DNY). Neodvozuj den z data a nepřepočítávej ho. Nikdy nezaměň pozítří za zítra.
 5. FORMÁT: Piš čistě obyčejným textem. NIKDY nepoužívej hvězdičky ani tučné písmo (**). Pro lepší přehlednost můžeš používat odrážky (-).
 6. DÉLKA: Piš podle potřeby, minimálně však 4 věty, horní limit není dán."""
 
