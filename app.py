@@ -1130,7 +1130,7 @@ def get_ai_daily_brief():
     global ai_summary_cache
     now = datetime.now()
     
-    if ai_summary_cache["last_updated"] and (now - ai_summary_cache["last_updated"]).total_seconds() < 600:
+    if ai_summary_cache["last_updated"] and (now - ai_summary_cache["last_updated"]).total_seconds() < 1800:
         return ai_summary_cache["text"]
 
     api_key = os.getenv('ANTHROPIC_API_KEY')
