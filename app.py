@@ -152,7 +152,7 @@ t212_instruments_mem = {"data": None, "last_updated": None}
 
 SECTOR_NAMES = {
     'Technology': 'Technologie',
-    'Communication Services': 'Komunikační služby',
+    'Communication Services': 'Komunikace',
     'Consumer Cyclical': 'Spotřební zboží',
     'Consumer Defensive': 'Základní spotřeba',
     'Healthcare': 'Zdravotnictví',
@@ -778,20 +778,107 @@ def get_trading212_sectors():
         return None
 
 
-def get_crypto_data():
+sp500_cache = {"data": None, "last_updated": None}
+
+def get_sp500_week_history(start_value):
     try:
-        url = 'https://api.coingecko.com/api/v3/coins/markets'
-        params = {'vs_currency': 'usd', 'ids': 'bitcoin', 'price_change_percentage': '7d'}
-        d = requests.get(url, params=params, timeout=3).json()[0]
-        return {
-            'price': d['current_price'],
-            'change_24h': d['price_change_percentage_24h'],
-            'change_7d': d.get('price_change_percentage_7d_in_currency'),
-            'ath': d['ath'],
-            'ath_change': d['ath_change_percentage']
-        }
-    except:
+        response = requests.get(
+            "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC",
+            params={'range': '5d', 'interval': '60m'},
+            headers=YAHOO_HEADERS,
+            timeout=10
+        )
+        response.raise_for_status()
+
+        result = response.json()['chart']['result'][0]
+        timestamps = result.get('timestamp') or []
+        closes = result['indicators']['quote'][0].get('close') or []
+        points = [(ts, c) for ts, c in zip(timestamps, closes) if c is not None]
+
+        if len(points) < 5:
+            return None
+
+        history = [{'date': '', 'value': round(start_value, 2)}]
+        for ts, c in points:
+            history.append({
+                'date': datetime.fromtimestamp(ts, timezone.utc).astimezone().strftime('%d.%m. %H:%M'),
+                'value': round(c, 2)
+            })
+        return history
+
+    except Exception as e:
+        print(f"S&P 500 týdenní historie chyba: {e}")
         return None
+
+def get_sp500_data():
+    now = datetime.now()
+    cached = sp500_cache["data"]
+    if cached and sp500_cache["last_updated"] and (now - sp500_cache["last_updated"]).total_seconds() < 300:
+        return cached
+
+    try:
+        response = requests.get(
+            "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC",
+            params={'range': '1mo', 'interval': '1d'},
+            headers=YAHOO_HEADERS,
+            timeout=10
+        )
+        response.raise_for_status()
+
+        result = response.json()['chart']['result'][0]
+        meta = result['meta']
+        timestamps = result.get('timestamp') or []
+        closes = result['indicators']['quote'][0].get('close') or []
+
+        points = [(ts, c) for ts, c in zip(timestamps, closes) if c is not None]
+        if len(points) < 2:
+            raise ValueError("Nedostatek dat z Yahoo")
+
+        values = [c for _, c in points]
+        current_price = meta.get('regularMarketPrice') or values[-1]
+        prev_close = values[-2]
+        week_ago_close = values[-6] if len(values) >= 6 else values[0]
+        high_52w = meta.get('fiftyTwoWeekHigh') or max(values)
+
+        change_24h = (current_price - prev_close) / prev_close * 100
+        change_7d = (current_price - week_ago_close) / week_ago_close * 100
+        from_high = (current_price - high_52w) / high_52w * 100
+
+        history = get_sp500_week_history(week_ago_close)
+        if not history:
+            history = [
+                {
+                    'date': datetime.fromtimestamp(ts, timezone.utc).astimezone().strftime('%d.%m.'),
+                    'value': round(c, 2)
+                }
+                for ts, c in points[-6:]
+            ]
+
+        data = {
+            'price': f"{current_price:,.0f}".replace(',', ' '),
+            'change_24h': f"{change_24h:+.2f}%",
+            'change_7d': f"{change_7d:+.2f}%",
+            'ath': f"{high_52w:,.0f}".replace(',', ' '),
+            'from_ath': f"{from_high:+.1f}%",
+            'history': history
+        }
+        sp500_cache["data"] = data
+        sp500_cache["last_updated"] = now
+        return data
+
+    except Exception as e:
+        print(f"Chyba S&P 500: {e}")
+        if cached:
+            return cached
+        return {
+            'price': 'N/A',
+            'change_24h': '0.00%',
+            'change_7d': '0.00%',
+            'ath': 'N/A',
+            'from_ath': '0.0%',
+            'history': []
+        }
+    
 
 def get_system_stats():
     try:
@@ -1055,6 +1142,7 @@ def get_ai_daily_brief():
         stock_news = get_stock_news()
         news = get_news()
         calendar = get_calendar_events()
+        sp500 = get_sp500_data()
 
         now_dt = datetime.now()
         today = now_dt.date()
@@ -1109,6 +1197,7 @@ Data z mého systému:
 {weather['temp']}°C, {weather['desc']}
 - Zprávy z akciových trhů:
 {stock_news['title']}: {stock_news['description']}
+- Index S&P 500: {sp500['price']} bodů (24h: {sp500['change_24h']}, 7d: {sp500['change_7d']})
 - Aktuální zpráva: 
 {news['title']}: {news['description']}
 - Kalendář:
@@ -1177,7 +1266,7 @@ def hardware_stats():
 @app.route('/api/external')
 def external_stats():
     return jsonify({
-        'btc': get_crypto_data(),
+        'sp500': get_sp500_data(),
         'news': get_news(),
         'stock_news': get_stock_news(),
         'weather': get_weather(),

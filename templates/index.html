@@ -55,6 +55,36 @@
             text-align: center;
         }
 
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .header-weather {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 3px;
+            padding: 8px 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-weather-temp {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .header-weather-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
         .clock-time {
             font-size: 1.6rem;
             font-weight: 700;
@@ -100,6 +130,16 @@
 
             .sidebar-right {
                 position: static;
+            }
+
+            .header-right {
+                flex-direction: column;
+                gap: 10px;
+                width: 100%;
+            }
+
+            .header-weather {
+                align-items: center;
             }
         }
 
@@ -281,24 +321,193 @@
             font-weight: 400;
         }
 
-        .news-card {
-            grid-column: 1 / -1;
-            align-items: flex-start;
-            text-align: left;
-            background: linear-gradient(135deg, rgba(22, 27, 34, 0.8), rgba(20, 40, 70, 0.4));
-            border-color: rgba(88, 166, 255, 0.3);
-        }
-
         .news-row {
             grid-column: 1 / -1;
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            min-width: 0;
+            align-items: stretch;
         }
 
         .news-row .news-card {
             grid-column: auto;
+        }
+
+        .news-card {
+            position: relative;
             min-width: 0;
+            min-height: 190px;
+            padding: 16px 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            text-align: left;
+            overflow: hidden;
+            background: linear-gradient(
+                145deg,
+                rgba(22, 27, 34, 0.96),
+                rgba(18, 25, 35, 0.92)
+            );
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 14px;
+            box-sizing: border-box;
+        }
+
+        .news-card::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--news-accent, var(--accent-blue));
+        }
+
+        .news-card.stock-news {
+            --news-accent: #58a6ff;
+        }
+
+        .news-card.general-news {
+            --news-accent: #f08888;
+        }
+
+        .news-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .news-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 13px;
+            min-width: 0;
+        }
+
+        .news-source {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            color: var(--news-accent);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .news-source-dot {
+            width: 7px;
+            height: 7px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: var(--news-accent);
+            box-shadow: 0 0 8px var(--news-accent);
+        }
+
+        .news-time {
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            white-space: nowrap;
+        }
+
+        .news-headline {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 3;
+            overflow: hidden;
+            min-height: 0;
+            margin-bottom: 9px;
+            color: var(--text-main);
+            font-size: 1.05rem;
+            font-weight: 700;
+            line-height: 1.4;
+            overflow-wrap: anywhere;
+        }
+
+
+        .news-desc {
+            display: block;
+            overflow: visible;
+            max-height: none;
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.84rem;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
+            white-space: normal;
+        }
+
+
+        .news-ai-summary {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(88, 166, 255, 0.07);
+            border: 1px solid rgba(88, 166, 255, 0.12);
+            color: #aebfd2;
+            font-size: 0.78rem;
+            line-height: 1.45;
+        }
+
+        .news-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: auto;
+            padding-top: 12px;
+        }
+
+        .news-category {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+        }
+
+        .news-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            color: var(--news-accent);
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-decoration: none;
+            white-space: nowrap;
+            transition: opacity 0.2s ease;
+        }
+
+        .news-link:hover {
+            opacity: 0.7;
+            text-decoration: underline;
+        }
+
+        @media (min-width: 1200px) {
+            .news-card {
+                min-height: 190px;
+                padding: 13px 15px;
+            }
+
+            .news-card-header {
+                margin-bottom: 10px;
+            }
+
+            .news-headline {
+                font-size: 0.96rem;
+                line-height: 1.35;
+                -webkit-line-clamp: 3;
+            }
+
+            .news-desc {
+                font-size: 0.79rem;
+                -webkit-line-clamp: 3;
+            }
+
+            .news-footer {
+                padding-top: 9px;
+            }
         }
 
         @media (max-width: 700px) {
@@ -307,23 +516,6 @@
             }
         }
 
-        .news-headline {
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: var(--accent-blue);
-            margin-bottom: 10px;
-            line-height: 1.3;
-        }
-
-        .news-desc {
-            font-size: 0.92rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-            display: -webkit-box;
-            -webkit-line-clamp: 4;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
 
         .alarms-card {
             background: var(--card-bg);
@@ -508,7 +700,6 @@
             .ai-text { font-size: 0.95rem; line-height: 1.45; }
             .news-row { gap: 14px; }
             .news-headline { font-size: 1.05rem; margin-bottom: 6px; }
-            .news-desc { -webkit-line-clamp: 3; }
 
             #calendar-list { gap: 8px; }
             .calendar-item { padding: 8px 12px; }
@@ -699,15 +890,78 @@
             white-space: nowrap;
             font-variant-numeric: tabular-nums;
         }
+
+        .sp500-card {
+            min-width: 0;
+            min-height: 0;
+            justify-content: flex-start;
+            overflow: hidden;
+        }
+
+        .sp500-card .card-title { margin-bottom: 8px; }
+        .sp500-card .stat-value { margin-bottom: 6px; }
+        .sp500-card .btc-changes { width: 100%; }
+
+        .sp500-chart-container {
+            position: relative;
+            width: 100%;
+            flex: 1 1 auto;
+            min-height: 55px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        #sp500-chart {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        @media (min-width: 1200px) {
+            .sector-card { grid-column: span 2; }
+        }
+
+        #fit-root {
+            display: flow-root;
+            transform-origin: top left;
+        }
+
+        html.fit-active,
+        html.fit-active body { height: 100%; }
+
+        html.fit-active body {
+            display: block;
+            margin: 0;
+            padding: 20px 36px 16px;
+            min-height: 0;
+            height: 100vh;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        html.fit-active .header-container,
+        html.fit-active .dashboard-container { max-width: none; }
+
     </style>
 </head>
 <body>
-
+    <div id="fit-root">
     <div class="header-container">
         <h1>Z.P.</h1>
-        <div class="digital-clock">
-            <div class="clock-time" id="live-clock">--:--</div>
-            <div class="clock-date" id="live-date">--</div>
+
+        <div class="header-right">
+            <div class="header-weather">
+                <span class="header-weather-temp" id="weather-temp">--°C</span>
+                <span class="header-weather-desc" id="weather-desc">Načítám počasí...</span>
+            </div>
+
+            <div class="digital-clock">
+                <div class="clock-time" id="live-clock">--:--</div>
+                <div class="clock-date" id="live-date">--</div>
+            </div>
         </div>
     </div>
 
@@ -755,13 +1009,15 @@
                 </div>
             </div>
 
-            <div class="card crypto-card">
-                <div class="card-title">Bitcoin (USD)</div>
-                <div class="stat-value" id="btc-val">Načítám...</div>
-                <div class="btc-changes">
-                    <div><span class="btc-label">24h</span><span id="btc-24h">--</span></div>
-                    <div><span class="btc-label">7d</span><span id="btc-7d">--</span></div>
-                    <div><span class="btc-label">ATH</span><span id="btc-ath">--</span></div>
+            <div class="card love-card">
+                <div class="card-title"><span class="heart-icon">❤️</span>Výročí</div>
+                <div class="stat-value" id="love-countdown">Do výročí: --</div>
+                <div class="stat-sub" id="love-together">-- dní spolu</div>
+                <div class="anniversary-progress">
+                    <div class="anniversary-progress-track">
+                        <div class="anniversary-progress-fill" id="love-progress"></div>
+                    </div>
+                    <span id="love-progress-percent">--%</span>
                 </div>
             </div>
 
@@ -780,21 +1036,18 @@
                 </div>
             </div>
 
-            <div class="card weather-card">
-                <div class="card-title">Počasí Praha</div>
-                <div class="stat-value" id="weather-temp">--°C</div>
-                <div class="stat-sub" id="weather-desc">Načítám...</div>
-            </div>
+            <div class="card crypto-card sp500-card">                
+                <div class="card-title">S&P 500</div>
+                <div class="stat-value" id="sp500-val">Načítám...</div>
 
-            <div class="card love-card">
-                <div class="card-title"><span class="heart-icon">❤️</span>Výročí</div>
-                <div class="stat-value" id="love-countdown">Do výročí: --</div>
-                <div class="stat-sub" id="love-together">-- dní spolu</div>
-                <div class="anniversary-progress">
-                    <div class="anniversary-progress-track">
-                        <div class="anniversary-progress-fill" id="love-progress"></div>
-                    </div>
-                    <span id="love-progress-percent">--%</span>
+                <div class="btc-changes">
+                    <div><span class="btc-label">24h</span><span id="sp500-24h">--</span></div>
+                    <div><span class="btc-label">7d</span><span id="sp500-7d">--</span></div>
+                    <div><span class="btc-label">52W HIGH</span><span id="sp500-ath">--</span></div>
+                </div>
+
+                <div class="sp500-chart-container">
+                    <canvas id="sp500-chart"></canvas>
                 </div>
             </div>
 
@@ -803,18 +1056,65 @@
                 <div class="ai-text" id="ai-brief-text">Generování přehledu...</div>
             </div>
             
+            
             <div class="news-row">
-                <div class="card news-card">
-                    <div class="card-title">📈 Akcie a trhy</div>
-                    <div class="news-headline" id="stock-title">Načítám akciovou zprávu...</div>
-                    <div class="news-desc" id="stock-desc">Čekám na data z RSS.</div>
+
+                <div class="card news-card stock-news">
+
+                    <div class="news-card-header">
+                        <div class="news-source">
+                            <span class="news-source-dot"></span>
+                            AKCIE A TRHY
+                        </div>
+                        <span class="news-time" id="stock-time">Aktuální zpráva</span>
+                    </div>
+
+                    <div class="news-headline" id="stock-title">
+                        Načítám akciovou zprávu...
+                    </div>
+
+                    <div class="news-desc" id="stock-desc">
+                        Čekám na data z RSS.
+                    </div>
+
+                    <div class="news-footer">
+                        <span class="news-category">FINANČNÍ TRHY</span>
+                        <a class="news-link" id="stock-link"
+                        href="#" target="_blank" rel="noopener noreferrer">
+                            Celý článek ↗
+                        </a>
+                    </div>
+
                 </div>
 
-                <div class="card news-card">
-                    <div class="card-title">📰 Seznam Zprávy</div>
-                    <div class="news-headline" id="news-title">Načítám nejnovější zprávu...</div>
-                    <div class="news-desc" id="news-desc">Čekám na data z RSS.</div>
+                <div class="card news-card general-news">
+
+                    <div class="news-card-header">
+                        <div class="news-source">
+                            <span class="news-source-dot"></span>
+                            SEZNAM ZPRÁVY
+                        </div>
+                        <span class="news-time" id="news-time">Aktuální zpráva</span>
+                    </div>
+
+                    <div class="news-headline" id="news-title">
+                        Načítám nejnovější zprávu...
+                    </div>
+
+                    <div class="news-desc" id="news-desc">
+                        Čekám na data z RSS.
+                    </div>
+
+                    <div class="news-footer">
+                        <span class="news-category">DOMÁCÍ A ZAHRANIČNÍ</span>
+                        <a class="news-link" id="news-link"
+                        href="#" target="_blank" rel="noopener noreferrer">
+                            Celý článek ↗
+                        </a>
+                    </div>
+
                 </div>
+
             </div>
         </div>
 
@@ -846,13 +1146,17 @@
         </div>
 
     </div>
+    </div>
 
     <script>
         const maxHistoryPoints = 20;
         const diskHistory = [];
+        let fitScale = 1;
+        let fitTimer = null;
+        let lastSP500History = [];
         const SECTOR_COLORS = {
             'Technologie': '#58a6ff',
-            'Komunikační služby': '#a78bfa',
+            'Komunikace': '#a78bfa',
             'Spotřební zboží': '#f0883e',
             'Základní spotřeba': '#ffa657',
             'Zdravotnictví': '#ff7b72',
@@ -914,6 +1218,75 @@
             svg.innerHTML = html;
         }
 
+        function drawSP500Chart(history) {
+            if (Array.isArray(history)) lastSP500History = history;
+
+            const canvas = document.getElementById('sp500-chart');
+            const box = canvas && canvas.parentElement;
+            if (!canvas || !box) return;
+
+            const width = box.clientWidth;
+            const height = box.clientHeight;
+            if (width <= 0 || height <= 0) return;
+
+            const ratio = (window.devicePixelRatio || 1) * fitScale;
+            canvas.width = Math.round(width * ratio);
+            canvas.height = Math.round(height * ratio);
+
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+            ctx.clearRect(0, 0, width, height);
+
+            const values = lastSP500History
+                .map(item => item.value)
+                .filter(v => Number.isFinite(v));
+            if (values.length < 2) return;
+
+            const min = Math.min(...values);
+            const max = Math.max(...values);
+            const range = max - min || 1;
+
+            const padX = 4;
+            const padTop = 8;
+            const padBottom = 6;
+            const chartW = width - padX * 2;
+            const chartH = height - padTop - padBottom;
+
+            const points = values.map((value, i) => ({
+                x: padX + (i / (values.length - 1)) * chartW,
+                y: padTop + chartH - ((value - min) / range) * chartH
+            }));
+
+            const up = values[values.length - 1] >= values[0];
+            const rgb = up ? '50, 190, 130' : '239, 100, 100';
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, height);
+            gradient.addColorStop(0, `rgba(${rgb}, 0.28)`);
+            gradient.addColorStop(1, `rgba(${rgb}, 0.02)`);
+
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, height);
+            points.forEach(p => ctx.lineTo(p.x, p.y));
+            ctx.lineTo(points[points.length - 1].x, height);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            ctx.beginPath();
+            points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+            ctx.strokeStyle = `rgb(${rgb})`;
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            const last = points[points.length - 1];
+            ctx.beginPath();
+            ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = `rgb(${rgb})`;
+            ctx.fill();
+        }
+        
         function updateSparkline(historyArray, elementId, minVal, maxVal) {
             const svgElement = document.getElementById(elementId);
             if (!svgElement) return;
@@ -1209,6 +1582,44 @@
             container.appendChild(layout);
         }
 
+
+        function updateNewsCard(prefix, data) {
+            if (!data) return;
+
+            const title = document.getElementById(`${prefix}-title`);
+            const desc = document.getElementById(`${prefix}-desc`);
+            const time = document.getElementById(`${prefix}-time`);
+            const summary = document.getElementById(`${prefix}-summary`);
+            const link = document.getElementById(`${prefix}-link`);
+
+            if (title && data.title) {
+                title.innerText = data.title;
+            }
+
+            if (desc && data.description) {
+                desc.innerText = data.description;
+            }
+
+            if (time) {
+                time.innerText = data.time || 'Aktuální zpráva';
+            }
+
+            if (summary && data.summary) {
+                summary.innerText = data.summary;
+            }
+
+            if (link) {
+                if (data.link && /^https?:\/\//i.test(data.link)) {
+                    link.href = data.link;
+                    link.style.display = 'inline-flex';
+                } else {
+                    link.removeAttribute('href');
+                    link.style.display = 'none';
+                }
+            }
+        }
+
+
         function fetchExternal() {
             fetch('/api/external')
                 .then(res => res.json())
@@ -1222,13 +1633,11 @@
                     }
 
                     if (data.news) {
-                        document.getElementById('news-title').innerText = data.news.title;
-                        document.getElementById('news-desc').innerText = data.news.description;
+                        updateNewsCard('news', data.news);
                     }
 
                     if (data.stock_news) {
-                        document.getElementById('stock-title').innerText = data.stock_news.title;
-                        document.getElementById('stock-desc').innerText = data.stock_news.description;
+                        updateNewsCard('stock', data.stock_news);
                     }
 
                     if (data.ai_brief) {
@@ -1239,12 +1648,22 @@
                         document.getElementById('ai-brief-time').innerText = '· ' + data.ai_brief_time;
                     }
 
-                    if (data.btc) {
-                        document.getElementById('btc-val').innerText = '$' + Number(data.btc.price).toLocaleString();
-                        setChange('btc-24h', data.btc.change_24h);
-                        setChange('btc-7d', data.btc.change_7d);
-                        document.getElementById('btc-ath').innerText =
-                            '$' + Number(data.btc.ath).toLocaleString() + ' (' + data.btc.ath_change.toFixed(1) + '%)';
+                    if (data.sp500) {
+                        document.getElementById('sp500-val').innerText =
+                            data.sp500.price + ' bodů';
+
+                        const el24h = document.getElementById('sp500-24h');
+                        el24h.innerText = data.sp500.change_24h;
+                        el24h.className = data.sp500.change_24h.includes('-') ? 'neg' : 'pos';
+
+                        const el7d = document.getElementById('sp500-7d');
+                        el7d.innerText = data.sp500.change_7d;
+                        el7d.className = data.sp500.change_7d.includes('-') ? 'neg' : 'pos';
+
+                        document.getElementById('sp500-ath').innerText =
+                            `${data.sp500.ath} (${data.sp500.from_ath})`;
+
+                        drawSP500Chart(data.sp500.history);
                     }
 
                     if (data.trading212) {
@@ -1382,8 +1801,9 @@
                         });
                     }
                 })
-                .catch(err => console.error('External Chyba:', err));
-        }
+                .catch(err => console.error('External Chyba:', err))
+                .finally(scheduleFit);        
+            }
 
         updateClock();
         updateLoveCounters();
@@ -1396,6 +1816,66 @@
         setInterval(fetchHardware, 5000);
         setInterval(fetchExternal, 60000);
         setInterval(updateAlarms, 1000);
+
+        function fitToScreen() {
+            const root = document.getElementById('fit-root');
+            const html = document.documentElement;
+            if (!root) return;
+
+            if (window.innerWidth < 1200) {
+                html.classList.remove('fit-active');
+                root.style.width = '';
+                root.style.transform = '';
+                fitScale = 1;
+                return;
+            }
+
+            html.classList.add('fit-active');
+
+            const cs = getComputedStyle(document.body);
+            const avail = window.innerHeight
+                - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+
+            const heightAt = s => {
+                root.style.width = (100 / s) + '%';
+                return root.offsetHeight * s;
+            };
+
+            let best = 0.4;
+            if (heightAt(1) <= avail) {
+                best = 1;
+            } else {
+                let lo = 0.4, hi = 1;
+                for (let i = 0; i < 8; i++) {
+                    const mid = (lo + hi) / 2;
+                    if (heightAt(mid) <= avail) { best = mid; lo = mid; }
+                    else { hi = mid; }
+                }
+            }
+
+            root.style.width = (100 / best) + '%';
+            root.style.transform = best < 1 ? `scale(${best})` : '';
+            fitScale = best;
+            drawSP500Chart();
+        }
+
+        function scheduleFit() {
+            clearTimeout(fitTimer);
+            fitTimer = setTimeout(() => requestAnimationFrame(fitToScreen), 150);
+        }
+
+        window.addEventListener('resize', scheduleFit);
+
+        const sp500Box = document.querySelector('.sp500-chart-container');
+        if (sp500Box && window.ResizeObserver) {
+            new ResizeObserver(() => drawSP500Chart()).observe(sp500Box);
+        }
+
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(scheduleFit);
+        }
+        scheduleFit();
     </script>
+    
 </body>
 </html>
